@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+*.db
+!demo/demo_scan.db
+.redline/
+.pytest_cache/
+*.egg-info/
+build/
+dist/

@@ -1,0 +1,13 @@
+[project]
+name = "redline"
+version = "0.1.0"
+description = "Redline — autonomous AI-agent red-teaming scanner"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.setuptools]
+py-modules = ["cli"]
+packages = ["redline", "redline.agents", "redline.adapters", "redline.sources", "api"]
