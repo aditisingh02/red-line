@@ -9,7 +9,7 @@ from .base import TargetAdapter
 
 class AnthropicAdapter(TargetAdapter):
     def __init__(self, target_url: str, auth_headers: dict[str, str] | None = None) -> None:
-        self.target_url = target_url or "https://api.anthropic.com/v1/messages"
+        self.target_url = target_url or settings.anthropic_base_url
         hdr = dict(auth_headers or {})
         self.model = hdr.pop("X-Model", settings.anthropic_model)
         self.headers = {

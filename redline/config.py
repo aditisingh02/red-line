@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-20250514"
+    anthropic_base_url: str = "https://api.anthropic.com/v1/messages"
+
+    openai_model: str = "gpt-3.5-turbo"
 
     redline_request_timeout: float = 10.0
     redline_max_retries: int = 3

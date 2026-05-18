@@ -14,7 +14,7 @@ class OpenAIAdapter(TargetAdapter):
         if not self.target_url.endswith("/chat/completions"):
             self.target_url += "/chat/completions"
         self.headers = {"Content-Type": "application/json", **(auth_headers or {})}
-        self.model = (auth_headers or {}).pop("X-Model", "gpt-3.5-turbo") if auth_headers else "gpt-3.5-turbo"
+        self.model = (auth_headers or {}).pop("X-Model", settings.openai_model)
 
     async def send_prompt(self, prompt: str) -> str:
         body = {"model": self.model, "messages": [{"role": "user", "content": prompt}]}
