@@ -89,6 +89,55 @@ def scan(
     typer.echo(json.dumps(report, indent=2, default=str) if json_out else render_text(report))
 
 
+@app.command("scan-repo")
+def scan_repo_cmd(
+    target: str = typer.Argument(..., help="Git URL or local path to scan"),
+    token: str = typer.Option("", help="GitHub token for private repos"),
+    sarif: str = typer.Option("", help="Write SARIF 2.1.0 to this path"),
+    json_out: bool = typer.Option(False, "--json", help="Print JSON report"),
+) -> None:
+    """Static scan of an agent codebase (no network calls to the agent)."""
+    from pathlib import Path
+
+    from redline.static_scanner import (
+        build_static_report,
+        scan_path,
+        scan_repo,
+        to_sarif,
+    )
+
+    if Path(target).exists():
+        findings, error = scan_path(target), None
+    else:
+        findings, error = scan_repo(target, token or settings.github_token)
+
+    report = build_static_report(target, findings, error)
+    if sarif:
+        Path(sarif).write_text(json.dumps(to_sarif(target, findings), indent=2))
+        typer.echo(f"SARIF written to {sarif}")
+    if json_out:
+        typer.echo(json.dumps(report, indent=2))
+    else:
+        s = report["summary"]
+        if error:
+            typer.echo(f"✖ scan error: {error}")
+        bs = s["by_severity"]
+        typer.echo(f"REDLINE STATIC SCAN — {target}")
+        typer.echo(f"Risk: {s['risk_level']}")
+        typer.echo(f"Files flagged: {s['files_flagged']}  "
+                   f"Findings: {s['total_findings']}  "
+                   f"(C{bs['critical']} H{bs['high']} "
+                   f"M{bs['medium']} L{bs['low']})")
+        typer.echo("=" * 64)
+        for f in report["findings"]:
+            typer.echo(f"[{f['severity'].upper()}] {f['rule_id']} "
+                       f"{f['file']}:{f['line']}")
+            typer.echo(f"  {f['title']}")
+            typer.echo(f"  > {f['snippet']}")
+            typer.echo(f"  fix: {f['recommendation']}")
+    raise typer.Exit(1 if report["summary"]["by_severity"]["critical"] else 0)
+
+
 @app.command("list-payloads")
 def list_payloads() -> None:
     payloads = StaticSource().fetch([])

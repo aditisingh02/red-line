@@ -61,8 +61,42 @@ cp .env.example .env      # add GROQ_API_KEY (optional; regex fallback works wit
 | POST | `/api/scans/{id}/cancel` | cancel a scan |
 | GET | `/api/scans/{id}/report?format=json` | full report |
 | POST | `/api/scan-url` | freemium quick scan (capped, no auth) |
-| POST | `/api/scan-repo` | stub (static scanner out of scope in v1) |
+| POST | `/api/scan-repo` | static codebase scan (`format=json\|sarif`) |
+| POST | `/api/github/webhook` | GitHub App: scans PRs, comments findings |
+| GET | `/metrics` | Prometheus exposition (no-op if disabled) |
 | GET | `/api/health` | status |
+
+## Static codebase scanner
+
+Regex/heuristic scan for insecure agent patterns (prompt-injection sinks,
+hardcoded secrets, unsafe eval/deserialization, disabled TLS, …). Pure stdlib;
+cloning uses the `git` CLI and degrades gracefully if git/the remote is
+unavailable. Inline `# redline: ignore` suppresses a line.
+
+```bash
+.venv/bin/python cli.py scan-repo .                       # local path
+.venv/bin/python cli.py scan-repo https://github.com/o/r --sarif out.sarif
+```
+
+Exit code is `1` when any CRITICAL finding is present (CI-friendly).
+
+## GitHub App / Actions
+
+- `.github/workflows/redline.yml` runs the static scan on every PR/push,
+  uploads SARIF to GitHub Code Scanning, comments a summary, and fails the
+  job on CRITICAL findings.
+- `/api/github/webhook` verifies the `X-Hub-Signature-256` HMAC
+  (`GITHUB_WEBHOOK_SECRET`), then scans the PR's repo and posts a comment
+  (best-effort; needs `GITHUB_TOKEN`).
+
+## Observability
+
+- **Prometheus**: `GET /metrics` (scans, findings by severity, test-duration
+  histogram, scorer-backend counter). Disable with `REDLINE_METRICS_ENABLED=false`.
+- **OpenTelemetry**: traces export only when `OTEL_EXPORTER_OTLP_ENDPOINT` is
+  set; otherwise spans are zero-cost no-ops.
+
+Both backends are optional dependencies — absent → no-op, never an error.
 
 ## Demo
 
@@ -79,6 +113,5 @@ cp .env.example .env      # add GROQ_API_KEY (optional; regex fallback works wit
 
 ## Notes / scope
 
-Out of scope for this v1 backend build: React UI, GitHub App/Actions,
-OpenTelemetry/Prometheus, static codebase scanner (`/api/scan-repo` returns a
-stub). Secrets live only in `.env` (gitignored).
+Out of scope for this build: React UI (backend + CLI only). Secrets live only
+in `.env` (gitignored).

@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     redline_demo_mode: bool = False
     redline_max_tests: int | None = None
 
+    # Observability (both optional; absent backend == no-op)
+    redline_metrics_enabled: bool = True
+    otel_exporter_otlp_endpoint: str = ""
+
+    # GitHub App / Actions integration
+    github_token: str = ""
+    github_webhook_secret: str = ""
+
     @property
     def scorer_backend(self) -> str:
         """Which judge to use. Groq preferred, then Anthropic, else regex."""

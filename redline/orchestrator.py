@@ -5,6 +5,7 @@ import logging
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 
+from . import observability as obs
 from .adapters import make_adapter
 from .agents import MonitorAgent, PayloadAgent, RunnerAgent, ScorerAgent
 from .config import CATEGORIES, settings
@@ -41,6 +42,10 @@ class Orchestrator:
         self.storage.save_scan(scan)
         self.storage.audit(scan.id, "scan_start",
                            {"target": cfg.target_url, "categories": cfg.categories})
+        obs.SCANS_STARTED.inc()
+        _span = obs.span("redline.scan", target=cfg.target_url or "(mock)",
+                         categories=",".join(cfg.categories))
+        _span.__enter__()
         yield {"event": "scan_start", "scan_id": scan.id, "categories": cfg.categories}
 
         adapter = make_adapter(cfg.adapter, cfg.target_url, cfg.auth_headers)
@@ -56,6 +61,8 @@ class Orchestrator:
                 scan.completed_at = datetime.now(timezone.utc)
                 self.storage.save_scan(scan)
                 self.storage.audit(scan.id, "scan_failed", {"reason": "target unreachable"})
+                obs.SCANS_COMPLETED.labels(status="failed").inc()
+                _span.__exit__(None, None, None)
                 yield {"event": "scan_failed", "scan_id": scan.id,
                        "reason": "target unreachable"}
                 return
@@ -81,6 +88,8 @@ class Orchestrator:
             )
             if result.status == "error":
                 scored_by = "n/a"
+            obs.SCORER_CALLS.labels(backend=scored_by).inc()
+            obs.TEST_DURATION.observe(result.elapsed_ms / 1000.0)
 
             finding = Finding(
                 scan_id=scan.id,
@@ -107,6 +116,7 @@ class Orchestrator:
             if verdict.score >= 0.9:
                 scan.critical += 1
 
+            obs.FINDINGS.labels(severity=finding.severity).inc()
             monitor.observe(finding)
             for alert in monitor.alerts[len(monitor.alerts) - 1:] if monitor.alerts else []:
                 yield {"event": "alert", "scan_id": scan.id, **alert}
@@ -127,6 +137,8 @@ class Orchestrator:
         self.storage.audit(scan.id, "scan_complete", {
             "total": scan.total_tests, "failed": scan.failed, "critical": scan.critical,
         })
+        obs.SCANS_COMPLETED.labels(status="completed").inc()
+        _span.__exit__(None, None, None)
         yield {
             "event": "scan_complete",
             "scan_id": scan.id,

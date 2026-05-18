@@ -1,0 +1,70 @@
+name: Redline security scan
+
+# Static-scans the agent codebase on every PR and push to main, uploads
+# results to GitHub Code Scanning, and fails the job on CRITICAL findings.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write   # required to upload SARIF
+  pull-requests: write     # required for the PR comment
+
+jobs:
+  static-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Redline
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run static scan
+        id: scan
+        run: |
+          python cli.py scan-repo . --sarif redline.sarif --json > report.json || echo "critical_found=1" >> "$GITHUB_OUTPUT"
+          cat report.json
+
+      - name: Upload SARIF to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: redline.sarif
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const r = JSON.parse(fs.readFileSync('report.json', 'utf8'));
+            const s = r.summary, bs = s.by_severity;
+            const body = [
+              '### 🛡️ Redline static scan',
+              '',
+              `**${s.risk_level}**`,
+              '',
+              `🔴 ${bs.critical}  🟠 ${bs.high}  🟡 ${bs.medium}  ⚪ ${bs.low} `
+              + `· ${s.total_findings} findings in ${s.files_flagged} files`,
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Fail on critical findings
+        if: steps.scan.outputs.critical_found == '1'
+        run: |
+          echo "::error::Redline found CRITICAL insecure patterns"
+          exit 1

@@ -10,4 +10,4 @@ testpaths = ["tests"]
 
 [tool.setuptools]
 py-modules = ["cli"]
-packages = ["redline", "redline.agents", "redline.adapters", "redline.sources", "api"]
+packages = ["redline", "redline.agents", "redline.adapters", "redline.sources", "redline.integrations", "api"]

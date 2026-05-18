@@ -4,15 +4,19 @@ from __future__ import annotations
 import asyncio
 import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from redline import __version__
+from redline import observability as obs
 from redline.config import settings
+from redline.integrations import github as gh
 from redline.models import ScanConfig
 from redline.orchestrator import Orchestrator
 from redline.report import build_report
+from redline.static_scanner import build_static_report, scan_repo, to_sarif
 from redline.storage import Storage
 
 from .sse import to_sse
@@ -45,6 +49,7 @@ class UrlRequest(BaseModel):
 class RepoRequest(BaseModel):
     repo_url: str
     github_token: str = ""
+    format: str = "json"  # json | sarif
 
 
 @app.get("/api/health")
@@ -141,6 +146,48 @@ async def scan_url(req: UrlRequest) -> dict:
 
 
 @app.post("/api/scan-repo")
-async def scan_repo(req: RepoRequest) -> dict:
-    return {"status": "not_implemented",
-            "detail": "Static codebase scanner is out of scope for the v1 backend build."}
+async def scan_repo_endpoint(req: RepoRequest):
+    """Shallow-clone a repo and statically scan it for insecure agent patterns."""
+    token = req.github_token or settings.github_token
+    findings, error = await asyncio.to_thread(scan_repo, req.repo_url, token)
+    if req.format == "sarif":
+        return JSONResponse(to_sarif(req.repo_url, findings))
+    return build_static_report(req.repo_url, findings, error)
+
+
+@app.get("/metrics")
+async def metrics() -> Response:
+    body, content_type = obs.render_metrics()
+    return Response(content=body, media_type=content_type)
+
+
+async def _run_repo_scan(repo: str, clone_url: str, pr_number: int) -> None:
+    findings, error = await asyncio.to_thread(
+        scan_repo, clone_url, settings.github_token)
+    report = build_static_report(clone_url, findings, error)
+    body = gh.pr_comment_markdown(report)
+    gh.post_pr_comment(repo, pr_number, body, settings.github_token)
+
+
+@app.post("/api/github/webhook")
+async def github_webhook(request: Request) -> JSONResponse:
+    """GitHub App webhook: scans PRs and (best-effort) comments findings back."""
+    raw = await request.body()
+    sig = request.headers.get("X-Hub-Signature-256")
+    if not gh.verify_signature(settings.github_webhook_secret, raw, sig):
+        return JSONResponse({"error": "invalid signature"}, status_code=401)
+    if request.headers.get("X-GitHub-Event") != "pull_request":
+        return JSONResponse({"status": "ignored"}, status_code=202)
+    try:
+        payload = __import__("json").loads(raw or b"{}")
+    except ValueError:
+        return JSONResponse({"error": "bad payload"}, status_code=400)
+    ev = gh.extract_pr_event(payload)
+    if not ev or not ev["clone_url"]:
+        return JSONResponse({"status": "ignored"}, status_code=202)
+    task = asyncio.create_task(
+        _run_repo_scan(ev["repo"], ev["clone_url"], ev["pr_number"]))
+    app.state.__dict__.setdefault("tasks", []).append(task)
+    return JSONResponse(
+        {"status": "scanning", "repo": ev["repo"], "pr": ev["pr_number"]},
+        status_code=202)
