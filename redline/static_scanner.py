@@ -198,7 +198,8 @@ def scan_repo(repo_url: str, github_token: str = "") -> tuple[list[StaticFinding
             capture_output=True, text=True, timeout=120,
         )
         if proc.returncode != 0:
-            err = (proc.stderr or "clone failed").strip().splitlines()[-1]
+            lines = (proc.stderr or "").strip().splitlines()
+            err = lines[-1] if lines else "git clone failed"
             # never echo the token back in an error
             return [], err.replace(github_token, "***") if github_token else err
         return scan_path(tmp), None

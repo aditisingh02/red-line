@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import Finding, ScanResult
@@ -114,7 +114,7 @@ class Storage:
                 "INSERT INTO audit_log (scan_id, event_type, event_data, timestamp) "
                 "VALUES (?,?,?,?)",
                 (scan_id, event_type, json.dumps(event_data, default=str),
-                 datetime.utcnow().isoformat()),
+                 datetime.now(timezone.utc).isoformat()),
             )
             c.commit()
 

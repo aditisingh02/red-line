@@ -183,7 +183,7 @@ async def github_webhook(request: Request) -> JSONResponse:
     except ValueError:
         return JSONResponse({"error": "bad payload"}, status_code=400)
     ev = gh.extract_pr_event(payload)
-    if not ev or not ev["clone_url"]:
+    if not ev or not ev["clone_url"] or not ev["pr_number"]:
         return JSONResponse({"status": "ignored"}, status_code=202)
     task = asyncio.create_task(
         _run_repo_scan(ev["repo"], ev["clone_url"], ev["pr_number"]))
