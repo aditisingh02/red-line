@@ -15,6 +15,18 @@ export type ScanRequest = {
   use_live_sources?: boolean;
 };
 
+export type ScanSummary = {
+  id: string;
+  target_url: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  total_tests: number;
+  passed: number;
+  failed: number;
+  critical: number;
+};
+
 export type StaticReport = {
   kind: string;
   target: string;
@@ -52,11 +64,14 @@ export const api = {
       body: JSON.stringify(body),
     }).then(j<{ scan_id: string; status: string }>),
 
+  listScans: (limit = 50) =>
+    fetch(`/api/scans?limit=${limit}`).then(j<{ scans: ScanSummary[] }>),
+
   cancelScan: (id: string) =>
     fetch(`/api/scans/${id}/cancel`, { method: "POST" }).then(j),
 
   report: (id: string) =>
-    fetch(`/api/scans/${id}/report`).then(j<Record<string, unknown>>),
+    fetch(`/api/scans/${id}/report`).then(j<Record<string, any>>),
 
   scanRepo: (repo_url: string, github_token = "") =>
     fetch("/api/scan-repo", {

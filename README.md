@@ -4,7 +4,7 @@ Autonomous AI-agent red-teaming scanner. Generates attack payloads, runs them
 against a target agent, scores responses with an LLM judge, and produces a
 structured security report.
 
-This build is the **backend + CLI** (no React UI).
+Ships with a Python backend, a CLI, and a React/Vite dashboard (`web/`).
 
 ## Architecture
 
@@ -111,7 +111,20 @@ Both backends are optional dependencies — absent → no-op, never an error.
 .venv/bin/pytest -q
 ```
 
+## Web dashboard
+
+Vite + React + Tailwind. Live-scan tab streams findings over SSE; static-scan
+tab runs the repo scanner; history tab lists past scans from the DB.
+
+```bash
+cd web
+npm install
+npm run dev          # http://localhost:5173, proxies /api -> :8000
+npm run build        # type-check + production bundle to web/dist
+```
+
+See `web/README.md` for details.
+
 ## Notes / scope
 
-Out of scope for this build: React UI (backend + CLI only). Secrets live only
-in `.env` (gitignored).
+Secrets live only in `.env` (gitignored).

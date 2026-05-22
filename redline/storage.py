@@ -86,6 +86,16 @@ class Storage:
             row = c.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone()
             return dict(row) if row else None
 
+    def list_scans(self, limit: int = 50) -> list[dict]:
+        with closing(self._conn()) as c:
+            rows = c.execute(
+                "SELECT id, target_url, started_at, completed_at, status, "
+                "total_tests, passed, failed, critical "
+                "FROM scans ORDER BY started_at DESC LIMIT ?",
+                (max(1, min(int(limit), 500)),),
+            ).fetchall()
+            return [dict(r) for r in rows]
+
     # --- findings ------------------------------------------------------
     def save_finding(self, f: Finding) -> None:
         with closing(self._conn()) as c:

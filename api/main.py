@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections import deque
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
@@ -29,6 +30,22 @@ _started = time.time()
 # scan_id -> live event buffer for the SSE stream
 _streams: dict[str, list[dict]] = {}
 _cancelled: set[str] = set()
+
+# Per-IP sliding window for the unauthed freemium endpoint.
+_RATE_WINDOW_SEC = 3600
+_RATE_LIMIT = 5
+_rate_hits: dict[str, deque[float]] = {}
+
+
+def _rate_limit_ok(ip: str) -> bool:
+    now = time.time()
+    bucket = _rate_hits.setdefault(ip, deque())
+    while bucket and now - bucket[0] > _RATE_WINDOW_SEC:
+        bucket.popleft()
+    if len(bucket) >= _RATE_LIMIT:
+        return False
+    bucket.append(now)
+    return True
 
 
 class ScanRequest(BaseModel):
@@ -89,6 +106,11 @@ async def create_scan(req: ScanRequest) -> dict:
     return {"scan_id": holder.get("id"), "status": "started"}
 
 
+@app.get("/api/scans")
+async def list_scans(limit: int = 50) -> dict:
+    return {"scans": _storage.list_scans(limit=limit)}
+
+
 @app.get("/api/scans/{scan_id}")
 async def get_scan(scan_id: str) -> dict:
     scan = _storage.get_scan(scan_id)
@@ -134,8 +156,15 @@ async def get_report(scan_id: str, format: str = "json") -> dict:
 
 
 @app.post("/api/scan-url")
-async def scan_url(req: UrlRequest) -> dict:
-    """Freemium quick scan — capped, no auth."""
+async def scan_url(req: UrlRequest, request: Request):
+    """Freemium quick scan — capped, no auth, rate-limited per IP."""
+    ip = (request.client.host if request.client else "") or "unknown"
+    if not _rate_limit_ok(ip):
+        return JSONResponse(
+            {"error": "rate_limited",
+             "detail": f"max {_RATE_LIMIT} freemium scans per hour per IP"},
+            status_code=429,
+        )
     cfg = ScanConfig(
         target_url=req.url, adapter="http",
         categories=["prompt_injection", "jailbreak", "data_exfiltration"],

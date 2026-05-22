@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Activity, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Activity, History, Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { api, streamScan, type Health, type StaticReport } from "@/lib/api";
+import { api, streamScan, type Health, type ScanSummary, type StaticReport } from "@/lib/api";
 
 const SEV_ORDER = ["critical", "high", "medium", "low"] as const;
 
@@ -390,6 +390,169 @@ function StaticScan() {
   );
 }
 
+function ScanHistory() {
+  const [scans, setScans] = useState<ScanSummary[]>([]);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [report, setReport] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setErr(null);
+    try {
+      const r = await api.listScans(50);
+      setScans(r.scans);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  async function open(id: string) {
+    setSelected(id);
+    setReport(null);
+    try {
+      setReport(await api.report(id));
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  }
+
+  const summary = report?.summary as
+    | { risk_level?: string; by_severity?: Record<string, number> }
+    | undefined;
+
+  return (
+    <div className="grid gap-6 md:grid-cols-[360px_1fr]">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle className="text-base">Past scans</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void refresh()}
+            disabled={loading}
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {err && (
+            <p className="text-sm text-muted-foreground">Error: {err}</p>
+          )}
+          {!err && scans.length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              {loading ? "Loading…" : "No scans yet."}
+            </p>
+          )}
+          <div className="divide-y divide-border">
+            {scans.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => void open(s.id)}
+                className={`flex w-full flex-col items-start gap-1 py-2 text-left text-sm hover:bg-muted/50 ${
+                  selected === s.id ? "bg-muted/40" : ""
+                }`}
+              >
+                <div className="flex w-full items-center justify-between">
+                  <span className="truncate font-mono text-xs">
+                    {s.target_url || "mock"}
+                  </span>
+                  <Badge
+                    variant={s.critical > 0 ? "default" : "muted"}
+                    className="font-mono"
+                  >
+                    {s.status}
+                  </Badge>
+                </div>
+                <div className="flex w-full justify-between text-[11px] text-muted-foreground">
+                  <span className="font-mono">
+                    {new Date(s.started_at).toLocaleString()}
+                  </span>
+                  <span className="font-mono">
+                    {s.passed}✓ {s.failed}✕ {s.critical}!
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">
+            {selected ? `Scan ${selected.slice(0, 8)}` : "Select a scan"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!selected && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Click a scan on the left to view its report.
+            </p>
+          )}
+          {selected && !report && (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              Loading report…
+            </p>
+          )}
+          {report && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {summary?.risk_level && (
+                  <Badge variant="outline">{summary.risk_level}</Badge>
+                )}
+                {SEV_ORDER.map((s) => (
+                  <Badge key={s} variant="outline" className="font-mono">
+                    {s[0].toUpperCase()} {summary?.by_severity?.[s] ?? 0}
+                  </Badge>
+                ))}
+              </div>
+              {Array.isArray(report.findings) && report.findings.length > 0 ? (
+                <div className="divide-y divide-border">
+                  {report.findings.map((f: any, i: number) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between py-2 text-sm"
+                    >
+                      <span className="font-mono">{f.category}</span>
+                      <span className="flex items-center gap-3">
+                        <span className="text-muted-foreground">
+                          {f.severity}
+                        </span>
+                        <Badge
+                          variant={f.score >= 0.6 ? "default" : "muted"}
+                          className="font-mono"
+                        >
+                          {f.verdict ?? (f.vulnerable ? "vulnerable" : "safe")}{" "}
+                          {typeof f.score === "number" ? f.score.toFixed(2) : "—"}
+                        </Badge>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  No findings recorded.
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   return (
     <div className="min-h-screen">
@@ -402,7 +565,7 @@ export default function Dashboard() {
               Dashboard
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Run a live red-team scan or statically scan a repository.
+              Run a live red-team scan, statically scan a repository, or browse past scans.
             </p>
           </div>
           <HealthPill />
@@ -412,12 +575,19 @@ export default function Dashboard() {
           <TabsList>
             <TabsTrigger value="live">Live scan</TabsTrigger>
             <TabsTrigger value="static">Static repo scan</TabsTrigger>
+            <TabsTrigger value="history">
+              <History className="mr-1.5 h-3.5 w-3.5" />
+              History
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="live">
             <LiveScan />
           </TabsContent>
           <TabsContent value="static">
             <StaticScan />
+          </TabsContent>
+          <TabsContent value="history">
+            <ScanHistory />
           </TabsContent>
         </Tabs>
       </main>
