@@ -2,8 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Minimal black & white. Light = white bg / near-black ink.
-   Dark = near-black bg / off-white ink. No accent colors. */
+/* Dark-first palette with a red accent (the "redline"). Light mode is kept
+   for completeness but the product is designed dark. */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -22,24 +22,31 @@
     --input: 0 0% 89%;
     --ring: 0 0% 4%;
     --radius: 0.5rem;
+
+    /* Red accent — the "redline". */
+    --red-50: 0 100% 97%;
+    --red-300: 0 90% 75%;
+    --red-500: 0 84% 60%;
+    --red-600: 0 78% 52%;
+    --red-700: 0 74% 42%;
   }
 
   .dark {
-    --background: 0 0% 4%;
+    --background: 0 0% 3%;
     --foreground: 0 0% 96%;
-    --card: 0 0% 6%;
+    --card: 0 0% 5%;
     --card-foreground: 0 0% 96%;
-    --primary: 0 0% 96%;
-    --primary-foreground: 0 0% 4%;
-    --secondary: 0 0% 12%;
+    --primary: 0 84% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 96%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 60%;
-    --accent: 0 0% 15%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 62%;
+    --accent: 0 0% 14%;
     --accent-foreground: 0 0% 96%;
-    --border: 0 0% 16%;
-    --input: 0 0% 18%;
-    --ring: 0 0% 80%;
+    --border: 0 0% 14%;
+    --input: 0 0% 16%;
+    --ring: 0 84% 60%;
   }
 
   * {
@@ -50,5 +57,39 @@
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .text-redline {
+    color: hsl(var(--red-500));
+  }
+  .bg-redline {
+    background-color: hsl(var(--red-500));
+  }
+  .border-redline {
+    border-color: hsl(var(--red-500));
+  }
+  .ring-redline {
+    --tw-ring-color: hsl(var(--red-500));
+  }
+
+  /* Soft red radial wash used behind hero sections. */
+  .red-wash {
+    background: radial-gradient(
+      ellipse at top,
+      hsl(var(--red-500) / 0.22),
+      hsl(var(--red-500) / 0.05) 35%,
+      transparent 70%
+    );
+  }
+
+  /* Animated red sweep used on the icon row. */
+  @keyframes redline-pulse {
+    0%, 100% { opacity: 0.45; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.06); }
+  }
+  .redline-pulse {
+    animation: redline-pulse 2.8s ease-in-out infinite;
   }
 }

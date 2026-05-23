@@ -8,10 +8,7 @@ const ThemeContext = createContext<Ctx>({ theme: "dark", toggle: () => {} });
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem("redline-theme") as Theme | null;
-    if (saved) return saved;
-    return window.matchMedia("(prefers-color-scheme: light)").matches
-      ? "light"
-      : "dark";
+    return saved ?? "dark";
   });
 
   useEffect(() => {

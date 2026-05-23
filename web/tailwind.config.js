@@ -30,6 +30,13 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        redline: {
+          50: "hsl(var(--red-50))",
+          300: "hsl(var(--red-300))",
+          500: "hsl(var(--red-500))",
+          600: "hsl(var(--red-600))",
+          700: "hsl(var(--red-700))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -44,8 +51,20 @@ export default {
           from: { opacity: "0", transform: "translateY(8px)" },
           to: { opacity: "1", transform: "translateY(0)" },
         },
+        "redline-shimmer": {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
+        "redline-float": {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-4px)" },
+        },
       },
-      animation: { "fade-up": "fade-up 0.5s ease-out forwards" },
+      animation: {
+        "fade-up": "fade-up 0.5s ease-out forwards",
+        "redline-shimmer": "redline-shimmer 6s linear infinite",
+        "redline-float": "redline-float 4s ease-in-out infinite",
+      },
     },
   },
   plugins: [],
