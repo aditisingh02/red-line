@@ -114,7 +114,7 @@ def scan_repo_cmd(
     report = build_static_report(target, findings, error)
     if sarif:
         Path(sarif).write_text(json.dumps(to_sarif(target, findings), indent=2))
-        typer.echo(f"SARIF written to {sarif}")
+        typer.echo(f"SARIF written to {sarif}", err=True)
     if json_out:
         typer.echo(json.dumps(report, indent=2))
     else:
