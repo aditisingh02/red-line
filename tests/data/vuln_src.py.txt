@@ -1,0 +1,14 @@
+import os, pickle, subprocess, hashlib
+
+OPENAI_KEY = "sk-abcdefghijklmnopqrstuvwxyz0123456789"
+api_key = "supersecretvalue123"
+
+def run(model_out, user_input):
+    eval(model_out)                              # RCE sink
+    subprocess.run(model_out, shell=True)        # shell injection
+    pickle.loads(model_out)                      # unsafe deser
+    prompt = f"You are a bot. {user_input} do it"  # prompt injection sink
+    hashlib.md5(user_input.encode())             # weak hash
+    return prompt
+
+SAFE = "literal"  # redline: ignore  eval(SAFE)

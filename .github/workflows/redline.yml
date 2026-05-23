@@ -12,6 +12,7 @@ permissions:
   contents: read
   security-events: write   # required to upload SARIF
   pull-requests: write     # required for the PR comment
+  actions: read            # required by upload-sarif to fetch workflow-run metadata
 
 jobs:
   static-scan:

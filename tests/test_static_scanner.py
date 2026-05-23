@@ -1,5 +1,6 @@
 import subprocess
 import types
+from pathlib import Path
 
 import redline.static_scanner as ss
 from redline.static_scanner import (
@@ -10,22 +11,9 @@ from redline.static_scanner import (
     to_sarif,
 )
 
-VULN_SRC = '''
-import os, pickle, subprocess, hashlib
-
-OPENAI_KEY = "sk-abcdefghijklmnopqrstuvwxyz0123456789"
-api_key = "supersecretvalue123"
-
-def run(model_out, user_input):
-    eval(model_out)                              # RCE sink
-    subprocess.run(model_out, shell=True)        # shell injection
-    pickle.loads(model_out)                      # unsafe deser
-    prompt = f"You are a bot. {user_input} do it"  # prompt injection sink
-    hashlib.md5(user_input.encode())             # weak hash
-    return prompt
-
-SAFE = "literal"  # redline: ignore  eval(SAFE)
-'''
+# Bait kept in a non-code fixture so the repo's own static scan doesn't
+# rediscover it on every CI run.
+VULN_SRC = (Path(__file__).parent / "data" / "vuln_src.py.txt").read_text()
 
 
 def test_scan_path_flags_insecure_patterns(tmp_path):
@@ -48,7 +36,7 @@ def test_suppression_comment_is_respected(tmp_path):
 def test_skips_vendored_dirs(tmp_path):
     bad = tmp_path / "node_modules" / "x.py"
     bad.parent.mkdir(parents=True)
-    bad.write_text('key = "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\n')
+    bad.write_text('key = "sk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"\n')  # redline: ignore
     assert scan_path(tmp_path) == []
 
 
@@ -65,7 +53,7 @@ def test_missing_path_returns_empty_not_raise(tmp_path):
 
 def test_oversized_file_is_skipped(tmp_path, monkeypatch):
     f = tmp_path / "big.py"
-    f.write_text('k = "sk-abcdefghijklmnopqrstuvwxyz0123456789"\n')
+    f.write_text('k = "sk-abcdefghijklmnopqrstuvwxyz0123456789"\n')  # redline: ignore
     monkeypatch.setattr(ss, "_MAX_FILE_BYTES", 1)
     assert scan_path(tmp_path) == []
 
@@ -113,7 +101,7 @@ def test_scan_repo_clone_timeout(monkeypatch):
 
 def test_sarif_shape(tmp_path):
     f = tmp_path / "a.py"
-    f.write_text('k = "sk-abcdefghijklmnopqrstuvwxyz0123456789"\n')
+    f.write_text('k = "sk-abcdefghijklmnopqrstuvwxyz0123456789"\n')  # redline: ignore
     sarif = to_sarif("repo", scan_path(tmp_path))
     assert sarif["version"] == "2.1.0"
     run = sarif["runs"][0]
