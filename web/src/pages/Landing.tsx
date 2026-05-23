@@ -797,6 +797,157 @@ function FlowLines() {
   );
 }
 
+/* ---------------- connect any repo ---------------- */
+
+type ConnectPath = {
+  tag: string;
+  title: string;
+  body: string;
+  icon: typeof TerminalSquare;
+  code: string;
+  language: "bash" | "yaml";
+  ctaHref?: string;
+  ctaLabel?: string;
+};
+
+const CONNECT_PATHS: ConnectPath[] = [
+  {
+    tag: "One-off · 30 sec",
+    title: "CLI",
+    icon: TerminalSquare,
+    body: "Shallow-clones the repo, runs the scanner, exits 1 on any CRITICAL finding. Add --token for private repos.",
+    language: "bash",
+    code:
+      "python cli.py scan-repo \\\n  https://github.com/owner/repo \\\n  --sarif out.sarif --json",
+  },
+  {
+    tag: "Scripted · HTTP",
+    title: "API",
+    icon: Code2,
+    body: "Same scan engine behind a POST endpoint. Works from any script, CI runner, or app. JSON or SARIF response.",
+    language: "bash",
+    code:
+      "curl -X POST :8000/api/scan-repo \\\n  -d '{\"repo_url\":\"https://github.com/o/r\"}' \\\n  -H 'content-type: application/json'",
+  },
+  {
+    tag: "Per-PR · no server",
+    title: "GitHub Action",
+    icon: Workflow,
+    body: "Drop one workflow file into the target repo. SARIF uploads to Code Scanning, PR comment is posted, job fails on CRITICAL.",
+    language: "yaml",
+    code:
+      "- uses: actions/checkout@v4\n- uses: your-org/redline-action@v1\n  with: { fail-on: critical }",
+    ctaHref: "https://github.com/",
+    ctaLabel: "Install action",
+  },
+  {
+    tag: "Multi-repo · central",
+    title: "GitHub App",
+    icon: Github,
+    body: "Install once on an org. Every PR fires a webhook to your Redline instance; verified by HMAC, comment posted back automatically.",
+    language: "bash",
+    code:
+      "GITHUB_TOKEN=...\nGITHUB_WEBHOOK_SECRET=...\n# point webhook → /api/github/webhook",
+    ctaLabel: "Setup guide",
+  },
+];
+
+function ConnectAnyRepo() {
+  return (
+    <section className="relative overflow-hidden border-t border-border/60">
+      <div className="absolute inset-x-0 top-0 -z-10 h-64 bg-gradient-to-b from-redline-500/5 to-transparent" />
+      <div className="mx-auto max-w-6xl px-6 py-24">
+        <SectionTitle
+          align="center"
+          eyebrow="Start"
+          title="Connect any repo"
+          sub="Four supported paths, pick by how often you want a scan and whether you have a server. All four hit the same scan engine and ship the same SARIF."
+        />
+
+        <div className="mt-12 grid gap-4 md:grid-cols-2">
+          {CONNECT_PATHS.map((p, i) => {
+            const Icon = p.icon;
+            return (
+              <motion.div
+                key={p.title}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-80px" }}
+                transition={{ duration: 0.45, delay: (i % 2) * 0.08 }}
+                className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card/80 p-6 backdrop-blur"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-redline-500/30 bg-redline-500/10 text-redline-300">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <h3 className="text-lg font-semibold tracking-tight">{p.title}</h3>
+                      <span className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                        {p.tag}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-border bg-background/40 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
+                    {p.language}
+                  </span>
+                </div>
+
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  {p.body}
+                </p>
+
+                <pre className="mt-4 overflow-x-auto rounded-xl border border-white/5 bg-zinc-950/80 px-4 py-3 text-[12px] leading-relaxed text-zinc-200">
+                  <code className="font-mono whitespace-pre">{p.code}</code>
+                </pre>
+
+                {p.ctaLabel && (
+                  <div className="mt-4">
+                    {p.ctaHref ? (
+                      <a
+                        href={p.ctaHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-sm font-medium text-redline-300 hover:text-redline-200"
+                      >
+                        {p.ctaLabel}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </a>
+                    ) : (
+                      <Link
+                        to="/dashboard"
+                        className="inline-flex items-center gap-1 text-sm font-medium text-redline-300 hover:text-redline-200"
+                      >
+                        {p.ctaLabel}
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    )}
+                  </div>
+                )}
+
+                <span className="pointer-events-none absolute -right-16 -bottom-16 h-40 w-40 rounded-full bg-redline-500/0 blur-3xl transition-colors group-hover:bg-redline-500/15" />
+              </motion.div>
+            );
+          })}
+        </div>
+
+        <p className="mt-10 text-center text-xs text-muted-foreground">
+          Detailed setup &amp; auth notes in the{" "}
+          <a
+            href="https://github.com/"
+            target="_blank"
+            rel="noreferrer"
+            className="underline decoration-redline-500/40 underline-offset-4 hover:text-foreground"
+          >
+            README
+          </a>
+          .
+        </p>
+      </div>
+    </section>
+  );
+}
+
 /* ---------------- bottom CTA with funnel beam ---------------- */
 
 function ExtensionCTA() {
@@ -888,6 +1039,7 @@ export default function Landing() {
       <BigCards />
       <MagicSearch />
       <Perks />
+      <ConnectAnyRepo />
       <ExtensionCTA />
       <Footer />
     </div>
