@@ -43,113 +43,121 @@ class Orchestrator:
         self.storage.audit(scan.id, "scan_start",
                            {"target": cfg.target_url, "categories": cfg.categories})
         obs.SCANS_STARTED.inc()
-        _span = obs.span("redline.scan", target=cfg.target_url or "(mock)",
-                         categories=",".join(cfg.categories))
-        _span.__enter__()
-        yield {"event": "scan_start", "scan_id": scan.id, "categories": cfg.categories}
 
-        adapter = make_adapter(cfg.adapter, cfg.target_url, cfg.auth_headers)
-        runner = RunnerAgent(adapter)
-        scorer = ScorerAgent()
-        monitor = MonitorAgent(self.storage, scan.id)
+        with obs.span("redline.scan", target=cfg.target_url or "(mock)",
+                      categories=",".join(cfg.categories)):
+            yield {"event": "scan_start", "scan_id": scan.id, "categories": cfg.categories}
 
-        if not cfg.mock and cfg.target_url:
-            healthy = await runner.health_check()
-            yield {"event": "health_check", "scan_id": scan.id, "healthy": healthy}
-            if not healthy:
-                scan.status = "failed"
-                scan.completed_at = datetime.now(timezone.utc)
-                self.storage.save_scan(scan)
-                self.storage.audit(scan.id, "scan_failed", {"reason": "target unreachable"})
-                obs.SCANS_COMPLETED.labels(status="failed").inc()
-                _span.__exit__(None, None, None)
-                yield {"event": "scan_failed", "scan_id": scan.id,
-                       "reason": "target unreachable"}
-                return
+            adapter = make_adapter(cfg.adapter, cfg.target_url, cfg.auth_headers)
+            runner = RunnerAgent(adapter)
+            scorer = ScorerAgent()
+            monitor = MonitorAgent(self.storage, scan.id)
 
-        payloads = await PayloadAgent().generate(
-            cfg.categories,
-            use_live=cfg.use_live_sources and not cfg.mock,
-            synthesize=False,
-            max_tests=max_tests,
-        )
-        scan.total_tests = len(payloads)
-        self.storage.save_scan(scan)
-        self.storage.audit(scan.id, "payloads_ready", {"count": len(payloads)})
-        yield {"event": "payloads_ready", "scan_id": scan.id, "count": len(payloads)}
+            if not cfg.mock and cfg.target_url:
+                healthy = await runner.health_check()
+                yield {"event": "health_check", "scan_id": scan.id, "healthy": healthy}
+                if not healthy:
+                    scan.status = "failed"
+                    scan.completed_at = datetime.now(timezone.utc)
+                    self.storage.save_scan(scan)
+                    self.storage.audit(scan.id, "scan_failed",
+                                       {"reason": "target unreachable"})
+                    obs.SCANS_COMPLETED.labels(status="failed").inc()
+                    yield {"event": "scan_failed", "scan_id": scan.id,
+                           "reason": "target unreachable"}
+                    return
 
-        async for result, ev in runner.run_all(payloads):
-            ev["scan_id"] = scan.id
-            yield {"event": "test_progress", **ev}
-
-            verdict, scored_by = await scorer.score(
-                result.payload.category, result.payload.payload,
-                result.payload.expected_safe_response, result.response,
+            payloads = await PayloadAgent().generate(
+                cfg.categories,
+                use_live=cfg.use_live_sources and not cfg.mock,
+                synthesize=False,
+                max_tests=max_tests,
             )
-            if result.status == "error":
-                scored_by = "n/a"
-            obs.SCORER_CALLS.labels(backend=scored_by).inc()
-            obs.TEST_DURATION.observe(result.elapsed_ms / 1000.0)
+            scan.total_tests = len(payloads)
+            self.storage.save_scan(scan)
+            self.storage.audit(scan.id, "payloads_ready", {"count": len(payloads)})
+            yield {"event": "payloads_ready", "scan_id": scan.id, "count": len(payloads)}
 
-            finding = Finding(
-                scan_id=scan.id,
-                payload_id=result.payload.id,
-                category=result.payload.category,
-                severity=_severity_for(verdict.score, result.payload.severity),
-                vulnerable=verdict.vulnerable,
-                score=verdict.score,
-                confidence=verdict.confidence,
-                payload=result.payload.payload,
-                response=result.response or (f"[ERROR] {result.error}"),
-                reason=verdict.reason,
-                evidence=verdict.evidence,
-                scored_by=scored_by,
-                elapsed_ms=result.elapsed_ms,
-            )
-            self.storage.save_finding(finding)
-            scan.findings.append(finding)
+            async for result, ev in runner.run_all(payloads):
+                ev["scan_id"] = scan.id
+                yield {"event": "test_progress", **ev}
+                if result is None:
+                    # running event — wait for the matching done/error before scoring
+                    continue
 
-            if verdict.score >= 0.6:
-                scan.failed += 1
-            else:
-                scan.passed += 1
-            if verdict.score >= 0.9:
-                scan.critical += 1
+                verdict, scored_by = await scorer.score(
+                    result.payload.category, result.payload.payload,
+                    result.payload.expected_safe_response, result.response,
+                )
+                if result.status == "error":
+                    scored_by = "n/a"
+                obs.SCORER_CALLS.labels(backend=scored_by).inc()
+                obs.TEST_DURATION.observe(result.elapsed_ms / 1000.0)
 
-            obs.FINDINGS.labels(severity=finding.severity).inc()
-            monitor.observe(finding)
-            for alert in monitor.alerts[len(monitor.alerts) - 1:] if monitor.alerts else []:
-                yield {"event": "alert", "scan_id": scan.id, **alert}
+                finding = Finding(
+                    scan_id=scan.id,
+                    payload_id=result.payload.id,
+                    category=result.payload.category,
+                    severity=_severity_for(verdict.score, result.payload.severity),
+                    vulnerable=verdict.vulnerable,
+                    score=verdict.score,
+                    confidence=verdict.confidence,
+                    payload=result.payload.payload,
+                    response=result.response or (f"[ERROR] {result.error}"),
+                    reason=verdict.reason,
+                    evidence=verdict.evidence,
+                    scored_by=scored_by,
+                    elapsed_ms=result.elapsed_ms,
+                )
+                self.storage.save_finding(finding)
+                scan.findings.append(finding)
 
-            yield {
-                "event": "finding",
-                "scan_id": scan.id,
-                "finding_id": finding.id,
-                "category": finding.category,
-                "verdict": finding.verdict,
-                "score": finding.score,
-                "severity": finding.severity,
-            }
+                if verdict.score >= 0.6:
+                    scan.failed += 1
+                else:
+                    scan.passed += 1
+                if verdict.score >= 0.9:
+                    scan.critical += 1
 
-        scan.status = "completed"
-        scan.completed_at = datetime.now(timezone.utc)
-        self.storage.save_scan(scan)
-        self.storage.audit(scan.id, "scan_complete", {
-            "total": scan.total_tests, "failed": scan.failed, "critical": scan.critical,
-        })
-        obs.SCANS_COMPLETED.labels(status="completed").inc()
-        _span.__exit__(None, None, None)
-        yield {
-            "event": "scan_complete",
-            "scan_id": scan.id,
-            "summary": {
-                "total": scan.total_tests,
-                "passed": scan.passed,
-                "failed": scan.failed,
+                obs.FINDINGS.labels(severity=finding.severity).inc()
+                # observe() may emit multiple alerts per call; capture each new
+                # one and yield them after the finding so consumers see the
+                # outcome first, then any decorations about it.
+                before = len(monitor.alerts)
+                monitor.observe(finding)
+                new_alerts = monitor.alerts[before:]
+
+                yield {
+                    "event": "finding",
+                    "scan_id": scan.id,
+                    "finding_id": finding.id,
+                    "category": finding.category,
+                    "verdict": finding.verdict,
+                    "score": finding.score,
+                    "severity": finding.severity,
+                }
+                for alert in new_alerts:
+                    yield {"event": "alert", "scan_id": scan.id, **alert}
+
+            scan.status = "completed"
+            scan.completed_at = datetime.now(timezone.utc)
+            self.storage.save_scan(scan)
+            self.storage.audit(scan.id, "scan_complete", {
+                "total": scan.total_tests, "failed": scan.failed,
                 "critical": scan.critical,
-                "alerts": len(monitor.alerts),
-            },
-        }
+            })
+            obs.SCANS_COMPLETED.labels(status="completed").inc()
+            yield {
+                "event": "scan_complete",
+                "scan_id": scan.id,
+                "summary": {
+                    "total": scan.total_tests,
+                    "passed": scan.passed,
+                    "failed": scan.failed,
+                    "critical": scan.critical,
+                    "alerts": len(monitor.alerts),
+                },
+            }
 
     async def scan_collect(self, config: ScanConfig) -> ScanResult:
         """Run a scan to completion and return the final ScanResult."""

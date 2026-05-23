@@ -5,7 +5,6 @@ import hashlib
 import hmac
 import json
 
-import pytest
 from fastapi.testclient import TestClient
 
 import api.main as apimain

@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from collections import deque
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
@@ -115,7 +116,7 @@ async def list_scans(limit: int = 50) -> dict:
 async def get_scan(scan_id: str) -> dict:
     scan = _storage.get_scan(scan_id)
     if not scan:
-        return {"error": "not found"}
+        raise HTTPException(status_code=404, detail="scan not found")
     return {
         "scan": scan,
         "findings": _storage.get_findings(scan_id),
@@ -125,20 +126,19 @@ async def get_scan(scan_id: str) -> dict:
 
 @app.get("/api/scans/{scan_id}/stream")
 async def stream_scan(scan_id: str) -> EventSourceResponse:
-    async def gen():
+    async def buffered_events():
         idx = 0
         while True:
             buf = _streams.get(scan_id, [])
             while idx < len(buf):
                 ev = buf[idx]
                 idx += 1
-                yield {"event": ev.get("event", "message"),
-                       "data": __import__("json").dumps(ev, default=str)}
+                yield ev
                 if ev.get("event") in ("scan_complete", "scan_failed", "scan_cancelled"):
                     return
             await asyncio.sleep(0.2)
 
-    return EventSourceResponse(gen())
+    return EventSourceResponse(to_sse(buffered_events()))
 
 
 @app.post("/api/scans/{scan_id}/cancel")
@@ -195,7 +195,9 @@ async def _run_repo_scan(repo: str, clone_url: str, pr_number: int) -> None:
         scan_repo, clone_url, settings.github_token)
     report = build_static_report(clone_url, findings, error)
     body = gh.pr_comment_markdown(report)
-    gh.post_pr_comment(repo, pr_number, body, settings.github_token)
+    # post_pr_comment uses sync httpx; run off the event loop
+    await asyncio.to_thread(
+        gh.post_pr_comment, repo, pr_number, body, settings.github_token)
 
 
 @app.post("/api/github/webhook")
@@ -208,7 +210,7 @@ async def github_webhook(request: Request) -> JSONResponse:
     if request.headers.get("X-GitHub-Event") != "pull_request":
         return JSONResponse({"status": "ignored"}, status_code=202)
     try:
-        payload = __import__("json").loads(raw or b"{}")
+        payload = json.loads(raw or b"{}")
     except ValueError:
         return JSONResponse({"error": "bad payload"}, status_code=400)
     ev = gh.extract_pr_event(payload)

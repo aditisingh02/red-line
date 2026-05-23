@@ -42,11 +42,19 @@ class RunnerAgent:
             log.warning("health check raised: %s", e)
             return False
 
-    async def run_all(self, payloads: list[Payload]) -> AsyncIterator[tuple[RunResult, dict]]:
-        """Yield (RunResult, sse_event) for each payload as it completes."""
+    async def run_all(
+        self, payloads: list[Payload]
+    ) -> AsyncIterator[tuple[RunResult | None, dict]]:
+        """Yield (result, sse_event) for each payload.
+
+        Emits a `status="running"` event with `result=None` before each
+        payload is sent, then a `status="done"|"error"` event with the
+        completed `RunResult` once it finishes. Consumers must skip the
+        running event (where result is None) before touching result.
+        """
         total = len(payloads)
         for idx, p in enumerate(payloads, 1):
-            yield_event = {
+            yield None, {
                 "test_id": p.id,
                 "category": p.category,
                 "status": "running",
@@ -55,7 +63,7 @@ class RunnerAgent:
                 "total": total,
             }
             result = await self._run_one(p)
-            ev = {
+            yield result, {
                 "test_id": p.id,
                 "category": p.category,
                 "status": "error" if result.status == "error" else "done",
@@ -63,7 +71,6 @@ class RunnerAgent:
                 "index": idx,
                 "total": total,
             }
-            yield result, ev
 
     async def _run_one(self, p: Payload) -> RunResult:
         start = time.perf_counter()

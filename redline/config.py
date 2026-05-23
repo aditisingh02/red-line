@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     groq_base_url: str = "https://api.groq.com/openai/v1"
 
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-sonnet-4-20250514"
+    anthropic_model: str = "claude-sonnet-4-6"
     anthropic_base_url: str = "https://api.anthropic.com/v1/messages"
 
     openai_model: str = "gpt-3.5-turbo"
