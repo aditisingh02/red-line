@@ -5,6 +5,50 @@ export type Health = {
   version: string;
   uptime: number;
   scorer: string;
+  auth_enabled?: boolean;
+};
+
+export type DashboardStats = {
+  total_scans: number;
+  total_tests: number;
+  total_failed: number;
+  total_critical: number;
+  by_severity: { critical: number; high: number; medium: number; low: number };
+  by_scorer: Record<string, number>;
+  avg_test_ms: number;
+};
+
+export type FlatFinding = {
+  id: string;
+  scan_id: string;
+  category: string;
+  severity: string;
+  score: number;
+  scored_by: string;
+  confidence: string;
+  elapsed_ms: number;
+  timestamp: string;
+  target_url: string;
+};
+
+export type RepoSummary = {
+  target_url: string;
+  total_scans: number;
+  last_scan_at: string;
+  last_status: string;
+  critical: number;
+  failed: number;
+  passed: number;
+};
+
+export type TrendPoint = { day: string; scans: number; critical: number };
+
+export type AuditEvent = {
+  id: number;
+  scan_id: string;
+  event_type: string;
+  event_data: string;
+  timestamp: string;
 };
 
 export type ScanRequest = {
@@ -79,6 +123,32 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ repo_url, github_token }),
     }).then(j<StaticReport>),
+
+  dashboardStats: () =>
+    fetch("/api/dashboard/stats").then(j<DashboardStats>),
+
+  dashboardFindings: (
+    opts: { limit?: number; severity?: string; category?: string } = {},
+  ) => {
+    const q = new URLSearchParams();
+    if (opts.limit) q.set("limit", String(opts.limit));
+    if (opts.severity) q.set("severity", opts.severity);
+    if (opts.category) q.set("category", opts.category);
+    return fetch(`/api/dashboard/findings?${q.toString()}`).then(
+      j<{ findings: FlatFinding[] }>,
+    );
+  },
+
+  dashboardRepos: () =>
+    fetch("/api/dashboard/repos").then(j<{ repos: RepoSummary[] }>),
+
+  dashboardTrend: (days = 30) =>
+    fetch(`/api/dashboard/trend?days=${days}`).then(
+      j<{ trend: TrendPoint[] }>,
+    ),
+
+  scanAudit: (id: string) =>
+    fetch(`/api/scans/${id}/audit`).then(j<{ events: AuditEvent[] }>),
 };
 
 // SSE stream of scan progress. Returns an unsubscribe fn.

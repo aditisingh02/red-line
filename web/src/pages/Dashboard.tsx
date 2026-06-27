@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Activity, History, Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import {
+  Activity,
+  GitBranch,
+  History,
+  LayoutDashboard,
+  Loader2,
+  RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+} from "lucide-react";
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +30,9 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { api, streamScan, type Health, type ScanSummary, type StaticReport } from "@/lib/api";
+import { Overview } from "./dashboard/Overview";
+import { Repos } from "./dashboard/Repos";
+import { AuditDrawer } from "./dashboard/AuditDrawer";
 
 const SEV_ORDER = ["critical", "high", "medium", "low"] as const;
 
@@ -390,7 +403,7 @@ function StaticScan() {
   );
 }
 
-function ScanHistory() {
+function ScanHistory({ onAudit }: { onAudit?: (id: string) => void }) {
   const [scans, setScans] = useState<ScanSummary[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [report, setReport] = useState<any>(null);
@@ -456,33 +469,48 @@ function ScanHistory() {
           )}
           <div className="divide-y divide-border">
             {scans.map((s) => (
-              <button
+              <div
                 key={s.id}
-                onClick={() => void open(s.id)}
-                className={`flex w-full flex-col items-start gap-1 py-2 text-left text-sm hover:bg-muted/50 ${
+                className={`flex w-full items-center justify-between gap-2 py-2 text-sm ${
                   selected === s.id ? "bg-muted/40" : ""
                 }`}
               >
-                <div className="flex w-full items-center justify-between">
-                  <span className="truncate font-mono text-xs">
-                    {s.target_url || "mock"}
-                  </span>
-                  <Badge
-                    variant={s.critical > 0 ? "default" : "muted"}
-                    className="font-mono"
+                <button
+                  onClick={() => void open(s.id)}
+                  className="flex flex-1 flex-col items-start gap-1 text-left hover:bg-muted/50"
+                >
+                  <div className="flex w-full items-center justify-between">
+                    <span className="truncate font-mono text-xs">
+                      {s.target_url || "mock"}
+                    </span>
+                    <Badge
+                      variant={s.critical > 0 ? "default" : "muted"}
+                      className="font-mono"
+                    >
+                      {s.status}
+                    </Badge>
+                  </div>
+                  <div className="flex w-full justify-between text-[11px] text-muted-foreground">
+                    <span className="font-mono">
+                      {new Date(s.started_at).toLocaleString()}
+                    </span>
+                    <span className="font-mono">
+                      {s.passed}✓ {s.failed}✕ {s.critical}!
+                    </span>
+                  </div>
+                </button>
+                {onAudit && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="shrink-0 text-[11px]"
+                    onClick={() => onAudit(s.id)}
                   >
-                    {s.status}
-                  </Badge>
-                </div>
-                <div className="flex w-full justify-between text-[11px] text-muted-foreground">
-                  <span className="font-mono">
-                    {new Date(s.started_at).toLocaleString()}
-                  </span>
-                  <span className="font-mono">
-                    {s.passed}✓ {s.failed}✕ {s.critical}!
-                  </span>
-                </div>
-              </button>
+                    Audit
+                  </Button>
+                )}
+              </div>
             ))}
           </div>
         </CardContent>
@@ -553,11 +581,30 @@ function ScanHistory() {
   );
 }
 
+const TABS = ["overview", "live", "static", "repos", "history"] as const;
+type TabKey = (typeof TABS)[number];
+
 export default function Dashboard() {
+  const [params, setParams] = useSearchParams();
+  const initial = (params.get("tab") as TabKey) || "overview";
+  const [tab, setTab] = useState<TabKey>(
+    TABS.includes(initial as TabKey) ? initial : "overview",
+  );
+  const [auditScanId, setAuditScanId] = useState<string | null>(null);
+
+  function switchTab(next: string) {
+    const v = (TABS.includes(next as TabKey) ? next : "overview") as TabKey;
+    setTab(v);
+    const p = new URLSearchParams(params);
+    if (v === "overview") p.delete("tab");
+    else p.set("tab", v);
+    setParams(p, { replace: true });
+  }
+
   return (
     <div className="min-h-screen">
       <Navbar />
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
@@ -565,31 +612,51 @@ export default function Dashboard() {
               Dashboard
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Run a live red-team scan, statically scan a repository, or browse past scans.
+              Metrics, findings, and the controls to run a new scan — all in one place.
             </p>
           </div>
           <HealthPill />
         </div>
 
-        <Tabs defaultValue="live">
+        <Tabs value={tab} onValueChange={switchTab}>
           <TabsList>
+            <TabsTrigger value="overview">
+              <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
+              Overview
+            </TabsTrigger>
             <TabsTrigger value="live">Live scan</TabsTrigger>
             <TabsTrigger value="static">Static repo scan</TabsTrigger>
+            <TabsTrigger value="repos">
+              <GitBranch className="mr-1.5 h-3.5 w-3.5" />
+              Repos
+            </TabsTrigger>
             <TabsTrigger value="history">
               <History className="mr-1.5 h-3.5 w-3.5" />
               History
             </TabsTrigger>
           </TabsList>
+          <TabsContent value="overview">
+            <Overview onOpenScan={(id) => setAuditScanId(id)} />
+          </TabsContent>
           <TabsContent value="live">
             <LiveScan />
           </TabsContent>
           <TabsContent value="static">
             <StaticScan />
           </TabsContent>
+          <TabsContent value="repos">
+            <Repos onRescan={() => switchTab("static")} />
+          </TabsContent>
           <TabsContent value="history">
-            <ScanHistory />
+            <ScanHistory onAudit={(id) => setAuditScanId(id)} />
           </TabsContent>
         </Tabs>
+
+        <AuditDrawer
+          scanId={auditScanId}
+          open={auditScanId !== null}
+          onClose={() => setAuditScanId(null)}
+        />
       </main>
     </div>
   );

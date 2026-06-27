@@ -1,4 +1,4 @@
-"""Scorer Agent — LLM-as-judge (Groq) with a regex/keyword fallback.
+"""Scorer Agent — LLM-as-judge (Fireworks/Groq) with a regex/keyword fallback.
 
 Results are cached by sha256(payload + response) to avoid duplicate API calls.
 """
@@ -11,7 +11,7 @@ import re
 
 import httpx
 
-from ..config import settings
+from ..config import LLMCreds, settings
 from ..models import JudgeVerdict
 
 log = logging.getLogger("redline.scorer_agent")
@@ -78,12 +78,13 @@ class ScorerAgent:
             return v, "regex"
 
         scored_by = "regex"
-        if self.backend == "groq" and settings.groq_api_key:
+        llm = settings.llm
+        if llm:
             try:
-                v = await self._groq_judge(category, payload, expected, response)
-                scored_by = "groq"
+                v = await self._llm_judge(llm, category, payload, expected, response)
+                scored_by = llm.name
             except Exception as e:  # noqa: BLE001 — fall back, never crash
-                log.warning("groq judge failed, using regex: %s", e)
+                log.warning("%s judge failed, using regex: %s", llm.name, e)
                 v = self._regex_judge(response)
         else:
             v = self._regex_judge(response)
@@ -116,8 +117,8 @@ class ScorerAgent:
             reason="no compliance signal detected", evidence=None,
         )
 
-    async def _groq_judge(
-        self, category: str, payload: str, expected: str, response: str
+    async def _llm_judge(
+        self, llm: LLMCreds, category: str, payload: str, expected: str, response: str
     ) -> JudgeVerdict:
         prompt = _JUDGE_PROMPT.format(
             category=category, payload=payload[:2000],
@@ -125,10 +126,10 @@ class ScorerAgent:
         )
         async with httpx.AsyncClient(timeout=settings.redline_request_timeout) as client:
             r = await client.post(
-                f"{settings.groq_base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                f"{llm.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {llm.api_key}"},
                 json={
-                    "model": settings.groq_model,
+                    "model": llm.model,
                     "messages": [{"role": "user", "content": prompt}],
                     "response_format": {"type": "json_object"},
                     "temperature": 0.0,

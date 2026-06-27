@@ -82,6 +82,7 @@ class ScanResult(BaseModel):
     critical: int = 0
     config: ScanConfig
     findings: list[Finding] = Field(default_factory=list)
+    user_id: str | None = None
 
 
 class JudgeVerdict(BaseModel):

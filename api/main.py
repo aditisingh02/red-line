@@ -6,12 +6,13 @@ import json
 import time
 from collections import deque
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from redline import __version__
+from redline import auth
 from redline import observability as obs
 from redline.config import settings
 from redline.integrations import github as gh
@@ -77,12 +78,94 @@ async def health() -> dict:
         "version": __version__,
         "uptime": round(time.time() - _started, 1),
         "scorer": settings.scorer_backend,
+        "auth_enabled": auth.oauth_configured(),
     }
 
 
-async def _run_scan(scan_id_holder: dict, cfg: ScanConfig) -> None:
+# --- auth ------------------------------------------------------------
+
+def current_user_optional(request: Request) -> auth.User | None:
+    return auth.resolve_session(_storage, request.cookies.get(auth.SESSION_COOKIE))
+
+
+def current_user(request: Request) -> auth.User:
+    user = current_user_optional(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    return user
+
+
+@app.get("/api/auth/github/login")
+async def auth_github_login() -> Response:
+    if not auth.oauth_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="GitHub OAuth not configured "
+                   "(set GITHUB_OAUTH_CLIENT_ID + GITHUB_OAUTH_CLIENT_SECRET)",
+        )
+    state = auth.new_state_token()
+    resp = RedirectResponse(auth.build_authorize_url(state), status_code=307)
+    resp.set_cookie(
+        auth.STATE_COOKIE, state,
+        max_age=600, httponly=True, samesite="lax",
+        secure=settings.github_oauth_redirect_uri.startswith("https://"),
+    )
+    return resp
+
+
+@app.get("/api/auth/github/callback")
+async def auth_github_callback(
+    request: Request, code: str = "", state: str = "", error: str = "",
+) -> Response:
+    if error:
+        raise HTTPException(status_code=400, detail=f"github oauth error: {error}")
+    expected = request.cookies.get(auth.STATE_COOKIE) or ""
+    if not code or not state or state != expected:
+        raise HTTPException(status_code=400, detail="invalid oauth state")
+    try:
+        token = await auth.exchange_code_for_token(code)
+        profile = await auth.fetch_github_user(token)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"github exchange failed: {e}")
+
+    user_row = _storage.upsert_user_from_github(
+        github_id=profile["github_id"],
+        github_login=profile["github_login"],
+        name=profile["name"],
+        email=profile["email"],
+        avatar_url=profile["avatar_url"],
+        access_token=token,
+    )
+    session_token, expires = auth.issue_session(_storage, user_row["id"])
+    resp = RedirectResponse(settings.auth_post_login_redirect, status_code=303)
+    resp.delete_cookie(auth.STATE_COOKIE)
+    resp.set_cookie(
+        auth.SESSION_COOKIE, session_token,
+        expires=expires.timestamp(), httponly=True, samesite="lax",
+        secure=settings.auth_post_login_redirect.startswith("https://"),
+        path="/",
+    )
+    return resp
+
+
+@app.post("/api/auth/logout")
+async def auth_logout(request: Request) -> Response:
+    auth.revoke_session(_storage, request.cookies.get(auth.SESSION_COOKIE))
+    resp = Response(status_code=204)
+    resp.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return resp
+
+
+@app.get("/api/auth/me")
+async def auth_me(user: auth.User = Depends(current_user)) -> dict:
+    return user.public_dict()
+
+
+async def _run_scan(
+    scan_id_holder: dict, cfg: ScanConfig, user_id: str | None = None,
+) -> None:
     buf: list[dict] = []
-    async for ev in _orch.scan(cfg):
+    async for ev in _orch.scan(cfg, user_id=user_id):
         if ev.get("event") == "scan_start":
             sid = ev["scan_id"]
             scan_id_holder["id"] = sid
@@ -94,10 +177,13 @@ async def _run_scan(scan_id_holder: dict, cfg: ScanConfig) -> None:
 
 
 @app.post("/api/scans")
-async def create_scan(req: ScanRequest) -> dict:
+async def create_scan(
+    req: ScanRequest, request: Request,
+) -> dict:
     cfg = ScanConfig(**req.model_dump())
+    user = current_user_optional(request)
     holder: dict = {}
-    task = asyncio.create_task(_run_scan(holder, cfg))
+    task = asyncio.create_task(_run_scan(holder, cfg, user.id if user else None))
     # wait briefly for the scan_id to be assigned
     for _ in range(50):
         if holder.get("id"):
@@ -108,8 +194,70 @@ async def create_scan(req: ScanRequest) -> dict:
 
 
 @app.get("/api/scans")
-async def list_scans(limit: int = 50) -> dict:
-    return {"scans": _storage.list_scans(limit=limit)}
+async def list_scans(request: Request, limit: int = 50) -> dict:
+    """Anonymous → all scans (legacy). Logged-in → only the user's scans."""
+    user = current_user_optional(request)
+    return {
+        "scans": _storage.list_scans(
+            limit=limit, user_id=user.id if user else None,
+        )
+    }
+
+
+@app.get("/api/me/scans")
+async def my_scans(
+    user: auth.User = Depends(current_user), limit: int = 50,
+) -> dict:
+    """Logged-in users' scans only. 401 if not authenticated."""
+    return {"scans": _storage.list_scans(limit=limit, user_id=user.id)}
+
+
+# --- dashboard aggregates ------------------------------------------
+
+def _user_scope(request: Request) -> str | None:
+    u = current_user_optional(request)
+    return u.id if u else None
+
+
+@app.get("/api/dashboard/stats")
+async def dashboard_stats(request: Request) -> dict:
+    """Counts for the overview cards. Scoped to the logged-in user if any."""
+    return _storage.aggregate_stats(user_id=_user_scope(request))
+
+
+@app.get("/api/dashboard/findings")
+async def dashboard_findings(
+    request: Request,
+    limit: int = 50,
+    severity: str | None = None,
+    category: str | None = None,
+) -> dict:
+    return {
+        "findings": _storage.list_findings(
+            user_id=_user_scope(request),
+            limit=limit,
+            severity=severity,
+            category=category,
+        )
+    }
+
+
+@app.get("/api/dashboard/repos")
+async def dashboard_repos(request: Request) -> dict:
+    return {"repos": _storage.list_repos(user_id=_user_scope(request))}
+
+
+@app.get("/api/dashboard/trend")
+async def dashboard_trend(request: Request, days: int = 30) -> dict:
+    return {"trend": _storage.scans_over_time(user_id=_user_scope(request), days=days)}
+
+
+@app.get("/api/scans/{scan_id}/audit")
+async def get_scan_audit(scan_id: str) -> dict:
+    """Audit timeline for a single scan (used by the dashboard drawer)."""
+    if not _storage.get_scan(scan_id):
+        raise HTTPException(status_code=404, detail="scan not found")
+    return {"events": _storage.get_audit(scan_id)}
 
 
 @app.get("/api/scans/{scan_id}")

@@ -24,7 +24,7 @@ class PayloadAgent:
         payloads = await collect_payloads(categories, use_live=use_live)
         payloads = self._dedupe(payloads)
 
-        if synthesize and settings.groq_api_key:
+        if synthesize and settings.llm:
             try:
                 payloads.extend(await self._synthesize(payloads, categories))
                 payloads = self._dedupe(payloads)
@@ -66,7 +66,10 @@ class PayloadAgent:
         return out[:cap]
 
     async def _synthesize(self, seeds: list[Payload], categories: list[str]) -> list[Payload]:
-        """Ask Groq for a few novel variants of existing seed payloads."""
+        """Ask the configured LLM for a few novel variants of existing seed payloads."""
+        llm = settings.llm
+        if not llm:
+            return []
         sample = seeds[:6]
         prompt = (
             "You generate adversarial test prompts for DEFENSIVE AI red-teaming only. "
@@ -77,10 +80,10 @@ class PayloadAgent:
         )
         async with httpx.AsyncClient(timeout=settings.redline_request_timeout) as client:
             r = await client.post(
-                f"{settings.groq_base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                f"{llm.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {llm.api_key}"},
                 json={
-                    "model": settings.groq_model,
+                    "model": llm.model,
                     "messages": [{"role": "user", "content": prompt}],
                     "response_format": {"type": "json_object"},
                     "temperature": 0.7,
@@ -103,7 +106,7 @@ class PayloadAgent:
                     payload=it["payload"],
                     source="synthesized",
                     severity="medium",
-                    tags=["groq-synth"],
+                    tags=[f"{llm.name}-synth"],
                 )
             )
         return out

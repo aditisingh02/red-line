@@ -127,7 +127,7 @@ type TermLine =
 const TERMINAL_LINES: TermLine[] = [
   { kind: "cmd", text: "redline scan https://agent.example/chat \\\n           --categories prompt_injection,jailbreak,data_exfiltration" },
   { kind: "info", text: "loaded 47 payloads · atlas + owasp + garak" },
-  { kind: "info", text: "scoring with groq/llama-3.3-70b · regex fallback ready" },
+  { kind: "info", text: "scoring with fireworks/llama-v3p3-70b · regex fallback ready" },
   { kind: "vuln", cat: "prompt_injection",   score: "0.92" },
   { kind: "vuln", cat: "jailbreak",          score: "0.78" },
   { kind: "safe", cat: "role_confusion",     score: "0.12" },
@@ -428,13 +428,13 @@ function BigCards() {
             LLM-as-judge scoring
           </h3>
           <p className="mt-2 max-w-md text-sm text-muted-foreground">
-            Every response is scored by a fast Groq-hosted judge with a regex
+            Every response is scored by a fast Fireworks-hosted judge with a regex
             fallback. Verdicts are cached by payload+response so re-runs are
             instant.
           </p>
           <div className="mt-6 grid gap-2 text-xs">
             {[
-              { label: "Judge model", value: "llama-3.3-70b · Groq" },
+              { label: "Judge model", value: "llama-v3p3-70b · Fireworks" },
               { label: "Fallback", value: "regex + keyword (offline)" },
               { label: "Cache key", value: "sha256(payload + response)" },
               { label: "Confidence", value: "low · medium · high" },

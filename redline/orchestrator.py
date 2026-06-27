@@ -29,7 +29,9 @@ class Orchestrator:
     def __init__(self, storage: Storage | None = None) -> None:
         self.storage = storage or Storage(settings.redline_db_path)
 
-    async def scan(self, config: ScanConfig) -> AsyncIterator[dict]:
+    async def scan(
+        self, config: ScanConfig, user_id: str | None = None
+    ) -> AsyncIterator[dict]:
         """Run a scan, yielding progress events. Final event carries the summary."""
         cfg = config
         if not cfg.categories:
@@ -38,7 +40,7 @@ class Orchestrator:
             cfg.adapter = "mock"
         max_tests = cfg.max_tests or settings.redline_max_tests
 
-        scan = ScanResult(target_url=cfg.target_url, config=cfg)
+        scan = ScanResult(target_url=cfg.target_url, config=cfg, user_id=user_id)
         self.storage.save_scan(scan)
         self.storage.audit(scan.id, "scan_start",
                            {"target": cfg.target_url, "categories": cfg.categories})
@@ -159,10 +161,12 @@ class Orchestrator:
                 },
             }
 
-    async def scan_collect(self, config: ScanConfig) -> ScanResult:
+    async def scan_collect(
+        self, config: ScanConfig, user_id: str | None = None
+    ) -> ScanResult:
         """Run a scan to completion and return the final ScanResult."""
         scan_id = None
-        async for ev in self.scan(config):
+        async for ev in self.scan(config, user_id=user_id):
             if ev.get("event") == "scan_start":
                 scan_id = ev["scan_id"]
         assert scan_id

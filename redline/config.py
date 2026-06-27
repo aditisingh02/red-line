@@ -2,8 +2,18 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import NamedTuple
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class LLMCreds(NamedTuple):
+    """Credentials for an OpenAI-compatible /chat/completions endpoint."""
+
+    name: str
+    base_url: str
+    api_key: str
+    model: str
 
 # The 10 attack categories from the Redline spec.
 CATEGORIES: list[str] = [
@@ -31,6 +41,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # Primary LLM-judge scorer (Fireworks AI, OpenAI-compatible).
+    fireworks_api_key: str = ""
+    fireworks_model: str = "accounts/fireworks/models/gpt-oss-120b"
+    fireworks_base_url: str = "https://api.fireworks.ai/inference/v1"
+
     groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
     groq_base_url: str = "https://api.groq.com/openai/v1"
@@ -55,11 +70,37 @@ class Settings(BaseSettings):
     github_token: str = ""
     github_webhook_secret: str = ""
 
+    # GitHub OAuth (user login). Works for both GitHub OAuth Apps and
+    # GitHub Apps — both expose /login/oauth/authorize. Leave empty to
+    # disable the login feature (the rest of the app still works).
+    github_oauth_client_id: str = ""
+    github_oauth_client_secret: str = ""
+    github_oauth_redirect_uri: str = (
+        "http://localhost:5173/api/auth/github/callback"
+    )
+    # Where the user lands after a successful login (frontend route).
+    auth_post_login_redirect: str = "http://localhost:5173/dashboard"
+
+    @property
+    def llm(self) -> LLMCreds | None:
+        """Active OpenAI-compatible LLM provider, or None if none is configured.
+
+        Fireworks is preferred, then Groq. Both share the same request shape,
+        so the scorer/payload agents can use whichever is returned here.
+        """
+        if self.fireworks_api_key:
+            return LLMCreds("fireworks", self.fireworks_base_url,
+                            self.fireworks_api_key, self.fireworks_model)
+        if self.groq_api_key:
+            return LLMCreds("groq", self.groq_base_url,
+                            self.groq_api_key, self.groq_model)
+        return None
+
     @property
     def scorer_backend(self) -> str:
-        """Which judge to use. Groq preferred, then Anthropic, else regex."""
-        if self.groq_api_key:
-            return "groq"
+        """Which judge to use. Fireworks/Groq preferred, then Anthropic, else regex."""
+        if self.llm:
+            return self.llm.name
         if self.anthropic_api_key:
             return "anthropic"
         return "regex"
