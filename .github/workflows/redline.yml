@@ -37,7 +37,13 @@ jobs:
 
       - name: Upload SARIF to Code Scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        # Non-fatal: Code Scanning may be disabled on the repo, or a fork PR
+        # downgrades `security-events` to read-only. Either way the upload
+        # 403s — don't let that fail the job; the scan + critical gate below
+        # still run. Enable Code Scanning in repo Settings → Code security to
+        # have these results surface in the Security tab.
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: redline.sarif
 
