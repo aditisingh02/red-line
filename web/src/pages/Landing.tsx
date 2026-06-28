@@ -1,6 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { AnimatePresence, motion, useScroll, useTransform } from "framer-motion";
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  useScroll,
+  useSpring,
+  useTransform,
+  type MotionValue,
+} from "framer-motion";
 import {
   ArrowRight,
   ArrowUp,
@@ -8,11 +16,12 @@ import {
   Brain,
   Bug,
   CheckCircle2,
-  ChevronRight,
   CircleAlert,
   Code2,
+  Crosshair,
   Download,
   FileSearch,
+  FileText,
   Flame,
   GaugeCircle,
   Github,
@@ -20,10 +29,12 @@ import {
   Layers,
   Plus,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   TerminalSquare,
   Wand2,
   Workflow,
+  X,
   Zap,
 } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
@@ -32,6 +43,51 @@ import { TextGenerateEffect } from "@/components/aceternity/text-generate-effect
 import { cn } from "@/lib/utils";
 
 /* ---------------- shared bits ---------------- */
+
+/* Page-wide scroll position, sprung for a natural feel. Doubles as an
+   orientation cue — motivated, not decoration. */
+function ScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 120,
+    damping: 30,
+    mass: 0.3,
+  });
+  return (
+    <motion.div
+      aria-hidden
+      style={{ scaleX }}
+      className="fixed inset-x-0 top-0 z-[60] h-[2.5px] origin-left bg-mint"
+    />
+  );
+}
+
+/* Reusable scroll-reveal: gentle rise + de-blur as the block enters the
+   viewport, once. Fully lit immediately under reduced motion. */
+function Reveal({
+  children,
+  className,
+  delay = 0,
+  y = 18,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+  y?: number;
+}) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      className={className}
+      initial={reduce ? false : { opacity: 0, y, filter: "blur(6px)" }}
+      whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ duration: 0.7, delay, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 function SectionTitle({
   eyebrow,
@@ -45,7 +101,7 @@ function SectionTitle({
   align?: "left" | "center";
 }) {
   return (
-    <div className={cn("max-w-2xl", align === "center" && "mx-auto text-center")}>
+    <Reveal className={cn("max-w-2xl", align === "center" && "mx-auto text-center")}>
       {eyebrow && (
         <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-redline-500/30 bg-redline-500/10 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-redline-300">
           <Flame className="h-3 w-3" />
@@ -58,7 +114,7 @@ function SectionTitle({
       {sub && (
         <p className="mt-3 text-sm text-muted-foreground sm:text-base">{sub}</p>
       )}
-    </div>
+    </Reveal>
   );
 }
 
@@ -77,45 +133,6 @@ const CATEGORIES = [
   { key: "social_engineering", label: "Social eng.", icon: Bug },
 ] as const;
 
-function FunnelBackdrop() {
-  const { scrollYProgress } = useScroll();
-  const y = useTransform(scrollYProgress, [0, 0.4], [0, -120]);
-  const o = useTransform(scrollYProgress, [0, 0.4], [1, 0.25]);
-  return (
-    <motion.svg
-      style={{ y, opacity: o }}
-      viewBox="0 0 1440 900"
-      preserveAspectRatio="xMidYMin slice"
-      className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[120vh] w-full"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="redCone" x1="50%" y1="0%" x2="50%" y2="100%">
-          <stop offset="0%" stopColor="hsl(240, 100%, 62%)" stopOpacity="0.85" />
-          <stop offset="40%" stopColor="hsl(240, 100%, 55%)" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="hsl(240, 95%, 48%)" stopOpacity="0" />
-        </linearGradient>
-        <radialGradient id="redGlow" cx="50%" cy="0%" r="60%">
-          <stop offset="0%" stopColor="hsl(240, 100%, 62%)" stopOpacity="0.55" />
-          <stop offset="100%" stopColor="hsl(240, 100%, 62%)" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <rect width="1440" height="900" fill="url(#redGlow)" />
-      <path d="M720 0 L1440 900 L0 900 Z" fill="url(#redCone)" />
-      <path
-        d="M720 0 L1200 900 L240 900 Z"
-        fill="url(#redCone)"
-        opacity="0.55"
-      />
-      <path
-        d="M720 0 L920 900 L520 900 Z"
-        fill="url(#redCone)"
-        opacity="0.45"
-      />
-    </motion.svg>
-  );
-}
-
 type TermLine =
   | { kind: "cmd"; text: string }
   | { kind: "info"; text: string }
@@ -127,7 +144,7 @@ type TermLine =
 const TERMINAL_LINES: TermLine[] = [
   { kind: "cmd", text: "redline scan https://agent.example/chat \\\n           --categories prompt_injection,jailbreak,data_exfiltration" },
   { kind: "info", text: "loaded 47 payloads · atlas + owasp + garak" },
-  { kind: "info", text: "scoring with fireworks/llama-v3p3-70b · regex fallback ready" },
+  { kind: "info", text: "scoring with fireworks/kimi-k2p5 · regex fallback ready" },
   { kind: "vuln", cat: "prompt_injection",   score: "0.92" },
   { kind: "vuln", cat: "jailbreak",          score: "0.78" },
   { kind: "safe", cat: "role_confusion",     score: "0.12" },
@@ -261,65 +278,239 @@ function Terminal() {
   );
 }
 
-function Hero() {
+/* Dismissible product announcement strip — scrolls away, nav sticks below it. */
+function AnnounceBar() {
+  const [open, setOpen] = useState(true);
+  if (!open) return null;
   return (
-    <section className="relative overflow-hidden pb-24 pt-16">
-      <FunnelBackdrop />
-      <div className="mx-auto max-w-5xl px-6 text-center">
-        <motion.span
-          initial={{ y: 8, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-card/70 px-3 py-1 text-[11px] font-medium text-muted-foreground backdrop-blur"
-        >
-          <span className="h-1.5 w-1.5 rounded-full bg-redline-500 redline-pulse" />
-          Redline 0.1 is live — 10 attack categories, MITRE ATLAS mapped
-          <ChevronRight className="h-3 w-3" />
-        </motion.span>
+    <div className="relative z-20 flex items-center justify-center gap-2 bg-primary px-10 py-2 text-center text-[13px] font-medium text-white">
+      <Sparkles className="h-3.5 w-3.5 shrink-0" />
+      <span>New: the Fireworks AI judge is live across every scan.</span>
+      <Link
+        to="/docs"
+        className="hidden underline underline-offset-2 hover:text-white/80 sm:inline"
+      >
+        See what changed
+      </Link>
+      <button
+        type="button"
+        onClick={() => setOpen(false)}
+        aria-label="Dismiss announcement"
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 transition-colors hover:text-white"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
 
-        <motion.h1
-          initial={{ y: 16, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.05 }}
-          className="mt-6 font-display text-5xl font-extrabold leading-[0.95] tracking-[-0.03em] sm:text-7xl"
-        >
-          Red-team{" "}
-          <span className="bg-gradient-to-b from-redline-200 via-redline-500 to-redline-700 bg-clip-text text-transparent">
-            any AI agent
-          </span>
-        </motion.h1>
+const HEADLINE = ["Red-team", "any", "AI", "agent"] as const;
 
-        <div className="mx-auto mt-5 max-w-2xl">
-          <TextGenerateEffect
-            className="text-base sm:text-lg"
-            words="Generate adversarial payloads, run them against a live agent, judge every response with an LLM, and ship a structured security report. CLI, API, and dashboard."
-          />
-        </div>
+/* Kinetic-type hero — words blur into focus over a deep electric-blue glow. */
+function Hero() {
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start start", "end start"],
+  });
+  const y = useTransform(scrollYProgress, [0, 1], [0, -80]);
+  const opacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
+  const fade = reduce ? undefined : { y, opacity };
+  return (
+    <section
+      ref={ref}
+      className="relative isolate flex min-h-[calc(100dvh-9rem)] flex-col items-center justify-center overflow-hidden px-6 pb-16 pt-12 text-center"
+    >
+      {/* full-bleed vertical wash: electric blue at the top → near-black at the
+          bottom. Fills the whole hero so there is no dead space, and stays in
+          the dark-blue family (no light-mode theme flip). */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-[#3a3aff] via-[#1a1ab0] to-[#08080f]"
+      />
+      {/* bright hotspot falling from the top-center */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(90%_55%_at_50%_-8%,#5b5bff_0%,transparent_60%)]"
+      />
 
-        <motion.div
-          initial={{ y: 10, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-8 flex flex-wrap items-center justify-center gap-3"
-        >
-          <Button asChild size="lg" className="bg-redline-600 text-white hover:bg-redline-500">
-            <Link to="/dashboard">
-              Open dashboard
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <a
-              href="https://owasp.org/www-project-top-10-for-large-language-model-applications/"
-              target="_blank"
-              rel="noreferrer"
+      <motion.div
+        style={fade}
+        className="relative z-10 flex flex-col items-center"
+      >
+      <h1 className="font-display font-extrabold leading-[0.9] tracking-[-0.04em] text-foreground text-[clamp(2.75rem,11vw,9.5rem)]">
+        {HEADLINE.map((w, i) => {
+          const focal = w === "any" || w === "AI";
+          return (
+            <motion.span
+              key={w}
+              initial={reduce ? false : { opacity: 0, filter: "blur(18px)", y: 14 }}
+              animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+              transition={{ duration: 0.9, delay: 0.08 * i, ease: [0.16, 1, 0.3, 1] }}
+              className={cn(
+                "inline-block",
+                i < HEADLINE.length - 1 && "mr-[0.2em]",
+                focal &&
+                  "bg-gradient-to-b from-redline-200 via-redline-400 to-primary bg-clip-text text-transparent",
+              )}
             >
-              OWASP LLM Top 10
-            </a>
-          </Button>
-        </motion.div>
+              {w}
+            </motion.span>
+          );
+        })}
+      </h1>
 
-        <Terminal />
+      <div className="relative z-10 mt-6 max-w-xl">
+        <TextGenerateEffect
+          className="text-base text-white/80 sm:text-lg"
+          words="Generate adversarial payloads, drive a live agent, and judge every response with an LLM."
+        />
+      </div>
+
+      <motion.div
+        initial={reduce ? false : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.55 }}
+        className="relative z-10 mt-9 flex flex-wrap items-center justify-center gap-3"
+      >
+        <Button
+          asChild
+          size="lg"
+          className="bg-white text-black hover:bg-white/90"
+        >
+          <Link to="/dashboard">
+            Open dashboard
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
+        <Button
+          asChild
+          variant="outline"
+          size="lg"
+          className="border-white/25 bg-zinc-950/40 text-white backdrop-blur hover:bg-zinc-950/60"
+        >
+          <Link to="/docs">Read the docs</Link>
+        </Button>
+      </motion.div>
+      </motion.div>
+    </section>
+  );
+}
+
+/* The manifesto as a flat token stream so the whole sentence flows as one
+   continuous paragraph (highlights live inline, mid-line, and wrap naturally). */
+type Token =
+  | { kind: "word"; text: string }
+  | { kind: "punct"; text: string }
+  | { kind: "mark"; text: string; icon: typeof ShieldCheck; tone: "blue" | "invert" };
+
+const STATEMENT_TOKENS: Token[] = [
+  ..."Redline is the only scanner where payloads, responses, and verdicts are generated, streamed, and judged live. The result?"
+    .split(" ")
+    .map((text): Token => ({ kind: "word", text })),
+  { kind: "mark", text: "superior coverage", icon: ShieldCheck, tone: "blue" },
+  { kind: "punct", text: "," },
+  { kind: "mark", text: "real adversarial pressure", icon: Crosshair, tone: "invert" },
+  { kind: "word", text: "and" },
+  { kind: "mark", text: "reports teams read", icon: FileText, tone: "invert" },
+  { kind: "punct", text: "." },
+];
+
+/* Inline highlight that flows continuously with the prose. box-decoration-clone
+   keeps the rounded fill intact when a phrase wraps across two lines. */
+function MarkInline({
+  icon: Icon,
+  tone,
+  text,
+}: {
+  icon: typeof ShieldCheck;
+  tone: "blue" | "invert";
+  text: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "whitespace-nowrap rounded-[0.32em] px-[0.34em] py-[0.04em]",
+        tone === "blue" ? "bg-primary text-white" : "bg-foreground text-background",
+      )}
+    >
+      <span className="mr-[0.3em] inline-grid h-[0.92em] w-[0.92em] translate-y-[0.1em] place-items-center rounded-[0.24em] bg-white/20">
+        <Icon className="h-[0.58em] w-[0.58em]" strokeWidth={2.4} />
+      </span>
+      {text}
+    </span>
+  );
+}
+
+/* One token of the manifesto. Opacity is driven by scroll position, so the
+   sentence brightens word-by-word as it passes through the viewport — a single
+   motivated read-along that guides the eye, then never repeats. Opacity only,
+   so it stays on the GPU; degrades to fully-lit under reduced motion. */
+function StatementToken({
+  token,
+  index,
+  count,
+  progress,
+  reduce,
+}: {
+  token: Token;
+  index: number;
+  count: number;
+  progress: MotionValue<number>;
+  reduce: boolean;
+}) {
+  const start = (index / count) * 0.8;
+  const opacity = useTransform(progress, [start, start + 0.18], [0.14, 1]);
+  const lead = index > 0 && token.kind !== "punct" ? " " : "";
+  const body =
+    token.kind === "mark" ? (
+      <MarkInline icon={token.icon} tone={token.tone} text={token.text} />
+    ) : (
+      token.text
+    );
+  if (reduce)
+    return (
+      <span>
+        {lead}
+        {body}
+      </span>
+    );
+  return (
+    <motion.span style={{ opacity }}>
+      {lead}
+      {body}
+    </motion.span>
+  );
+}
+
+/* Editorial manifesto — one continuous sentence, key claims marked inline,
+   revealed as a scroll-linked read-along. */
+function Statement() {
+  const reduce = useReducedMotion() ?? false;
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ["start 0.82", "end 0.55"],
+  });
+  return (
+    <section
+      id="statement"
+      className="relative scroll-mt-24 border-t border-border/60 bg-background"
+    >
+      <div ref={ref} className="mx-auto max-w-5xl px-6 py-28 sm:py-36">
+        <h2 className="font-display text-3xl font-bold leading-[1.4] tracking-[-0.02em] text-foreground sm:text-5xl sm:leading-[1.36]">
+          {STATEMENT_TOKENS.map((token, i) => (
+            <StatementToken
+              key={i}
+              token={token}
+              index={i}
+              count={STATEMENT_TOKENS.length}
+              progress={scrollYProgress}
+              reduce={reduce}
+            />
+          ))}
+        </h2>
       </div>
     </section>
   );
@@ -434,7 +625,7 @@ function BigCards() {
           </p>
           <div className="mt-6 grid gap-2 text-xs">
             {[
-              { label: "Judge model", value: "llama-v3p3-70b · Fireworks" },
+              { label: "Judge model", value: "kimi-k2p5 · Fireworks" },
               { label: "Fallback", value: "regex + keyword (offline)" },
               { label: "Cache key", value: "sha256(payload + response)" },
               { label: "Confidence", value: "low · medium · high" },
@@ -974,28 +1165,31 @@ function ExtensionCTA() {
       </svg>
 
       <div className="mx-auto max-w-4xl px-6 py-24 text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-          1.2k stars · MIT licensed
-        </span>
-        <h2 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">
-          Redline GitHub Action
-        </h2>
-        <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
-          Drop the action into <span className="font-mono">.github/workflows</span>{" "}
-          and every PR ships through the static scanner with SARIF uploaded to
-          Code Scanning.
-        </p>
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-          <Button asChild size="lg" className="bg-redline-600 text-white hover:bg-redline-500">
-            <a href="https://github.com/" target="_blank" rel="noreferrer">
-              Install action
-              <Download className="h-4 w-4" />
-            </a>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link to="/dashboard">Open dashboard</Link>
-          </Button>
-        </div>
+        <Reveal>
+          <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
+            1.2k stars · MIT licensed
+          </span>
+          <h2 className="mt-6 text-4xl font-semibold tracking-tight sm:text-5xl">
+            Redline GitHub Action
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base">
+            Drop the action into{" "}
+            <span className="font-mono">.github/workflows</span> and every PR
+            ships through the static scanner with SARIF uploaded to Code
+            Scanning.
+          </p>
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+            <Button asChild size="lg" className="bg-redline-600 text-white hover:bg-redline-500">
+              <a href="https://github.com/" target="_blank" rel="noreferrer">
+                Install action
+                <Download className="h-4 w-4" />
+              </a>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link to="/dashboard">Open dashboard</Link>
+            </Button>
+          </div>
+        </Reveal>
 
         <RedlineFlow />
       </div>
@@ -1008,7 +1202,7 @@ function ExtensionCTA() {
 function Footer() {
   return (
     <footer className="border-t border-border/60">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 text-xs text-muted-foreground sm:flex-row">
+      <Reveal className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 text-xs text-muted-foreground sm:flex-row">
         <div className="flex items-center gap-2 font-mono tracking-[0.3em]">
           <span className="h-1.5 w-1.5 rounded-full bg-redline-500" />
           REDLINE · v0.1
@@ -1025,7 +1219,7 @@ function Footer() {
             OWASP
           </a>
         </div>
-      </div>
+      </Reveal>
     </footer>
   );
 }
@@ -1033,8 +1227,14 @@ function Footer() {
 export default function Landing() {
   return (
     <div className="dot-grid relative min-h-screen overflow-hidden bg-background">
+      <ScrollProgress />
+      <AnnounceBar />
       <Navbar />
       <Hero />
+      <Statement />
+      <section className="border-t border-border/60 px-6 pb-12">
+        <Terminal />
+      </section>
       <FeatureRow3 />
       <BigCards />
       <MagicSearch />

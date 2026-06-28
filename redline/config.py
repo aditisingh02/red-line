@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # Primary LLM-judge scorer (Fireworks AI, OpenAI-compatible).
     fireworks_api_key: str = ""
-    fireworks_model: str = "accounts/fireworks/models/gpt-oss-120b"
+    fireworks_model: str = "accounts/fireworks/models/kimi-k2p5"
     fireworks_base_url: str = "https://api.fireworks.ai/inference/v1"
 
     groq_api_key: str = ""

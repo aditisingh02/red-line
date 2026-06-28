@@ -273,7 +273,7 @@ export default function Docs() {
             <CodeBlock
               label=".env"
               code={
-                "cp .env.example .env\n\n# in .env — the primary judge (preferred over Groq/Anthropic):\nFIREWORKS_API_KEY=fw_xxxxxxxxxxxxxxxxx\nFIREWORKS_MODEL=accounts/fireworks/models/gpt-oss-120b\nFIREWORKS_BASE_URL=https://api.fireworks.ai/inference/v1"
+                "cp .env.example .env\n\n# in .env: the primary judge (preferred over Groq/Anthropic)\nFIREWORKS_API_KEY=fw_xxxxxxxxxxxxxxxxx\nFIREWORKS_MODEL=accounts/fireworks/models/kimi-k2p5\nFIREWORKS_BASE_URL=https://api.fireworks.ai/inference/v1"
               }
             />
             <p className="mt-4">
