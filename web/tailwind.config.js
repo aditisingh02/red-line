@@ -30,9 +30,15 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        mint: {
+          DEFAULT: "hsl(var(--mint))",
+          foreground: "hsl(var(--mint-foreground))",
+        },
         redline: {
           50: "hsl(var(--red-50))",
+          200: "hsl(var(--red-200))",
           300: "hsl(var(--red-300))",
+          400: "hsl(var(--red-400))",
           500: "hsl(var(--red-500))",
           600: "hsl(var(--red-600))",
           700: "hsl(var(--red-700))",
@@ -44,6 +50,8 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
+        sans: ["Satoshi", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Cabinet Grotesk", "Satoshi", "ui-sans-serif", "sans-serif"],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       keyframes: {

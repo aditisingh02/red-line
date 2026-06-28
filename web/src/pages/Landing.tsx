@@ -91,13 +91,13 @@ function FunnelBackdrop() {
     >
       <defs>
         <linearGradient id="redCone" x1="50%" y1="0%" x2="50%" y2="100%">
-          <stop offset="0%" stopColor="hsl(0, 84%, 60%)" stopOpacity="0.85" />
-          <stop offset="40%" stopColor="hsl(0, 84%, 50%)" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="hsl(0, 84%, 40%)" stopOpacity="0" />
+          <stop offset="0%" stopColor="hsl(240, 100%, 62%)" stopOpacity="0.85" />
+          <stop offset="40%" stopColor="hsl(240, 100%, 55%)" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="hsl(240, 95%, 48%)" stopOpacity="0" />
         </linearGradient>
         <radialGradient id="redGlow" cx="50%" cy="0%" r="60%">
-          <stop offset="0%" stopColor="hsl(0, 84%, 60%)" stopOpacity="0.55" />
-          <stop offset="100%" stopColor="hsl(0, 84%, 60%)" stopOpacity="0" />
+          <stop offset="0%" stopColor="hsl(240, 100%, 62%)" stopOpacity="0.55" />
+          <stop offset="100%" stopColor="hsl(240, 100%, 62%)" stopOpacity="0" />
         </radialGradient>
       </defs>
       <rect width="1440" height="900" fill="url(#redGlow)" />
@@ -229,10 +229,10 @@ function Terminal() {
               {l.kind === "safe" && (
                 <div className="flex items-center justify-between gap-4">
                   <span>
-                    <span className="text-muted-foreground">✗</span>{" "}
+                    <span className="text-mint">✓</span>{" "}
                     <span className="text-muted-foreground">{l.cat}</span>
                   </span>
-                  <span className="rounded bg-white/5 px-2 py-0.5 text-[11px] text-muted-foreground">
+                  <span className="rounded bg-mint/10 px-2 py-0.5 text-[11px] text-mint">
                     SAFE {l.score}
                   </span>
                 </div>
@@ -281,10 +281,10 @@ function Hero() {
           initial={{ y: 16, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.05 }}
-          className="mt-6 text-5xl font-semibold tracking-tight sm:text-7xl"
+          className="mt-6 font-display text-5xl font-extrabold leading-[0.95] tracking-[-0.03em] sm:text-7xl"
         >
           Red-team{" "}
-          <span className="bg-gradient-to-b from-redline-300 via-redline-500 to-redline-700 bg-clip-text text-transparent">
+          <span className="bg-gradient-to-b from-redline-200 via-redline-500 to-redline-700 bg-clip-text text-transparent">
             any AI agent
           </span>
         </motion.h1>
@@ -961,8 +961,8 @@ function ExtensionCTA() {
       >
         <defs>
           <linearGradient id="beam" x1="50%" y1="0%" x2="50%" y2="100%">
-            <stop offset="0%" stopColor="hsl(0, 84%, 60%)" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="hsl(0, 84%, 60%)" stopOpacity="0" />
+            <stop offset="0%" stopColor="hsl(240, 100%, 62%)" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="hsl(240, 100%, 62%)" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d="M720 0 L1100 700 L340 700 Z" fill="url(#beam)" />
@@ -1032,7 +1032,7 @@ function Footer() {
 
 export default function Landing() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background">
+    <div className="dot-grid relative min-h-screen overflow-hidden bg-background">
       <Navbar />
       <Hero />
       <FeatureRow3 />

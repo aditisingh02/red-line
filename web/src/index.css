@@ -2,51 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Dark-first palette with a red accent (the "redline"). Light mode is kept
-   for completeness but the product is designed dark. */
+/* ------------------------------------------------------------------ *
+ * Redline design system
+ * Near-black canvas · electric-blue primary · mint accent.
+ * Type: Cabinet Grotesk (display) + Satoshi (text) + mono (data).
+ * Dark-first — light mode is kept sane but the product is designed dark.
+ * ------------------------------------------------------------------ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 4%;
+    --background: 60 14% 98%;      /* #FAFAF8 */
+    --foreground: 0 0% 4%;         /* #0A0A0A */
     --card: 0 0% 100%;
     --card-foreground: 0 0% 4%;
-    --primary: 0 0% 4%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 240 100% 55%;       /* #1B1BFF electric blue */
+    --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 40%;
-    --accent: 0 0% 94%;
+    --accent: 0 0% 94%;            /* neutral hover surface */
     --accent-foreground: 0 0% 9%;
     --border: 0 0% 89%;
     --input: 0 0% 89%;
-    --ring: 0 0% 4%;
-    --radius: 0.5rem;
+    --ring: 240 100% 55%;
+    --radius: 0.75rem;
 
-    /* Red accent — the "redline". */
-    --red-50: 0 100% 97%;
-    --red-300: 0 90% 75%;
-    --red-500: 0 84% 60%;
-    --red-600: 0 78% 52%;
-    --red-700: 0 74% 42%;
+    /* Mint signal accent — #00FF9C */
+    --mint: 157 100% 50%;
+    --mint-foreground: 0 0% 4%;
+
+    /* Brand blue ramp. Kept under the legacy --red-* names so every
+       existing `redline-*` utility re-skins to blue with zero churn. */
+    --red-50: 240 100% 97%;
+    --red-200: 240 100% 88%;
+    --red-300: 240 100% 80%;
+    --red-400: 240 100% 70%;
+    --red-500: 240 100% 62%;
+    --red-600: 240 100% 55%;
+    --red-700: 240 95% 48%;
   }
 
   .dark {
-    --background: 0 0% 3%;
-    --foreground: 0 0% 96%;
-    --card: 0 0% 5%;
-    --card-foreground: 0 0% 96%;
-    --primary: 0 84% 60%;
+    --background: 0 0% 4%;         /* #0A0A0A */
+    --foreground: 60 14% 98%;      /* #FAFAF8 */
+    --card: 0 0% 10%;             /* #1A1A1A */
+    --card-foreground: 60 14% 98%;
+    --primary: 240 100% 60%;       /* electric blue, lifted for dark */
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 10%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 62%;
-    --accent: 0 0% 14%;
-    --accent-foreground: 0 0% 96%;
-    --border: 0 0% 14%;
-    --input: 0 0% 16%;
-    --ring: 0 84% 60%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 60 14% 98%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 16%;            /* neutral hover surface */
+    --accent-foreground: 60 14% 98%;
+    --border: 0 0% 16%;
+    --input: 0 0% 18%;
+    --ring: 240 100% 62%;
+
+    --mint: 157 100% 50%;
+    --mint-foreground: 0 0% 4%;
+
+    --red-50: 240 100% 97%;
+    --red-200: 240 100% 88%;
+    --red-300: 240 100% 82%;
+    --red-400: 240 100% 72%;
+    --red-500: 240 100% 64%;
+    --red-600: 240 100% 58%;
+    --red-700: 240 95% 50%;
   }
 
   * {
@@ -55,12 +77,20 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: "Satoshi", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-feature-settings: "ss01" 1, "cv01" 1;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Editorial display type — Cabinet Grotesk on every heading. */
+  h1, h2, h3, h4 {
+    font-family: "Cabinet Grotesk", "Satoshi", ui-sans-serif, system-ui, sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
 @layer utilities {
+  /* Brand-color aliases (blue is the new "redline"). */
   .text-redline {
     color: hsl(var(--red-500));
   }
@@ -74,17 +104,53 @@
     --tw-ring-color: hsl(var(--red-500));
   }
 
-  /* Soft red radial wash used behind hero sections. */
+  /* Mint signal helpers. */
+  .text-mint {
+    color: hsl(var(--mint));
+  }
+  .bg-mint {
+    background-color: hsl(var(--mint));
+  }
+  .border-mint {
+    border-color: hsl(var(--mint));
+  }
+
+  /* Soft blue radial wash used behind hero / feature sections. */
   .red-wash {
     background: radial-gradient(
       ellipse at top,
-      hsl(var(--red-500) / 0.22),
+      hsl(var(--red-500) / 0.20),
       hsl(var(--red-500) / 0.05) 35%,
       transparent 70%
     );
   }
 
-  /* Animated red sweep used on the icon row. */
+  /* Dotted blueprint grid — the texture behind the reference boards. */
+  .dot-grid {
+    background-image: radial-gradient(
+      hsl(var(--foreground) / 0.06) 1px,
+      transparent 1px
+    );
+    background-size: 22px 22px;
+  }
+  /* Fine engineering line-grid for inset panels. */
+  .line-grid {
+    background-image:
+      linear-gradient(to right, hsl(var(--foreground) / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.045) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* Uppercase monospace data label — the "INDIA STANDARD TIME" treatment. */
+  .data-label {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    font-size: 0.6875rem;
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Animated brand pulse used on status dots / the icon row. */
   @keyframes redline-pulse {
     0%, 100% { opacity: 0.45; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.06); }
