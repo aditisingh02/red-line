@@ -123,14 +123,15 @@ export function Navbar() {
               {l.label}
             </Link>
           ))}
-          <a
-            href="https://github.com/anthropics/claude-code"
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          <Link
+            to="/docs"
+            className={cn(
+              "text-sm transition-colors hover:text-foreground",
+              pathname === "/docs" ? "text-foreground" : "text-muted-foreground",
+            )}
           >
             Docs
-          </a>
+          </Link>
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />

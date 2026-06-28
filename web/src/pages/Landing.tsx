@@ -187,7 +187,7 @@ function Terminal() {
             <span className="h-3 w-3 rounded-full bg-zinc-700" />
             <span className="h-3 w-3 rounded-full bg-zinc-700" />
           </div>
-          <span className="font-mono text-[11px] text-muted-foreground">
+          <span className="font-mono text-[11px] text-zinc-400">
             ~/redline — zsh
           </span>
           <span className="w-12" />
@@ -206,20 +206,20 @@ function Terminal() {
               {l.kind === "cmd" && (
                 <>
                   <span className="text-redline-400">$</span>{" "}
-                  <span className="text-foreground">{l.text}</span>
+                  <span className="text-zinc-100">{l.text}</span>
                 </>
               )}
               {l.kind === "info" && (
                 <>
-                  <span className="text-muted-foreground">→</span>{" "}
-                  <span className="text-muted-foreground">{l.text}</span>
+                  <span className="text-zinc-500">→</span>{" "}
+                  <span className="text-zinc-400">{l.text}</span>
                 </>
               )}
               {l.kind === "vuln" && (
                 <div className="flex items-center justify-between gap-4">
                   <span>
                     <span className="text-redline-400">✓</span>{" "}
-                    <span className="text-foreground">{l.cat}</span>
+                    <span className="text-zinc-100">{l.cat}</span>
                   </span>
                   <span className="rounded bg-redline-500/15 px-2 py-0.5 text-[11px] text-redline-300">
                     VULN {l.score}
@@ -230,7 +230,7 @@ function Terminal() {
                 <div className="flex items-center justify-between gap-4">
                   <span>
                     <span className="text-mint">✓</span>{" "}
-                    <span className="text-muted-foreground">{l.cat}</span>
+                    <span className="text-zinc-400">{l.cat}</span>
                   </span>
                   <span className="rounded bg-mint/10 px-2 py-0.5 text-[11px] text-mint">
                     SAFE {l.score}
@@ -241,7 +241,7 @@ function Terminal() {
                 <span className="text-redline-400">⚠ {l.text}</span>
               )}
               {l.kind === "done" && (
-                <span className="text-foreground">■ {l.text}</span>
+                <span className="text-zinc-100">■ {l.text}</span>
               )}
             </motion.div>
           ))}
@@ -541,7 +541,7 @@ function MagicSearch() {
             <div className="relative mx-auto">
               <span className="absolute -inset-4 -z-10 rounded-full bg-redline-500/25 blur-2xl" />
               <div className="flex items-center gap-3 rounded-full border border-redline-500/50 bg-zinc-950/95 px-3 py-2.5 text-left shadow-[0_0_60px_-10px_hsl(var(--red-500)/0.8)] backdrop-blur">
-                <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/5 text-foreground/80">
+                <button className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/5 text-zinc-300">
                   <Plus className="h-4 w-4" />
                 </button>
                 <span className="relative h-5 flex-1 overflow-hidden">
@@ -674,8 +674,8 @@ function RedlineFlow() {
         <span className="absolute inset-0 -z-10 rounded-2xl bg-redline-500/20 blur-3xl" />
         <div className="ml-auto w-[180px] rounded-2xl border border-white/10 bg-zinc-900/90 p-4 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.6)]">
           <div className="mb-3 flex items-center gap-2">
-            <Github className="h-4 w-4 text-foreground" />
-            <span className="font-mono text-[11px] text-muted-foreground">
+            <Github className="h-4 w-4 text-zinc-200" />
+            <span className="font-mono text-[11px] text-zinc-400">
               owner/repo
             </span>
           </div>
@@ -689,10 +689,10 @@ function RedlineFlow() {
               className="mb-1.5 flex items-center gap-2 rounded-md border border-white/5 bg-white/[0.02] px-2 py-1.5 text-[11px]"
             >
               <Code2 className="h-3 w-3 text-redline-400" />
-              <span className="truncate font-mono text-foreground/80">{f}</span>
+              <span className="truncate font-mono text-zinc-300">{f}</span>
             </div>
           ))}
-          <div className="mt-3 flex items-center justify-between text-[10px] text-muted-foreground">
+          <div className="mt-3 flex items-center justify-between text-[10px] text-zinc-400">
             <span className="font-mono">PR #42</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-redline-500/15 px-2 py-0.5 font-mono text-redline-300">
               <span className="h-1 w-1 animate-pulse rounded-full bg-redline-500" />
@@ -710,7 +710,7 @@ function RedlineFlow() {
         <span className="absolute inset-0 -z-10 rounded-2xl bg-redline-500/20 blur-3xl" />
         <div className="mr-auto w-[180px] rounded-2xl border border-white/10 bg-zinc-900/90 p-4 shadow-[0_15px_40px_-10px_rgba(0,0,0,0.6)]">
           <div className="mb-3 flex items-center justify-between">
-            <span className="font-mono text-[11px] text-muted-foreground">
+            <span className="font-mono text-[11px] text-zinc-400">
               code scanning
             </span>
             <span className="font-mono text-[10px] text-redline-300">3</span>
@@ -724,7 +724,7 @@ function RedlineFlow() {
               key={f.label}
               className="mb-1.5 flex items-center justify-between rounded-md border border-white/5 bg-white/[0.02] px-2 py-1.5 text-[11px]"
             >
-              <span className="truncate font-mono text-foreground/80">
+              <span className="truncate font-mono text-zinc-300">
                 {f.label}
               </span>
               <span
@@ -1014,7 +1014,7 @@ function Footer() {
           REDLINE · v0.1
         </div>
         <div className="flex items-center gap-4">
-          <a href="#" className="hover:text-foreground">Docs</a>
+          <Link to="/docs" className="hover:text-foreground">Docs</Link>
           <a href="#" className="hover:text-foreground">GitHub</a>
           <a
             href="https://owasp.org/www-project-top-10-for-large-language-model-applications/"
